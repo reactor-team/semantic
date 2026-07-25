@@ -43,7 +43,7 @@ const (
 	// linkVersion covers link extraction only: which edges a file yields, and
 	// their targets, anchors, kinds, and lines. Bumping it re-extracts links
 	// and touches neither chunks nor vectors.
-	linkVersion = 2
+	linkVersion = 3
 )
 
 // Keys under which the stamps live in the meta table.

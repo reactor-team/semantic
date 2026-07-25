@@ -122,8 +122,10 @@ func (g *Graph) Broken() []Edge {
 		}
 		// A markdown link to a directory (e.g. `../services/`) resolves to no
 		// file but renders as that directory's listing on GitHub — valid, not
-		// broken.
-		if e.Kind == chunk.LinkMarkdown && g.resolver.IsDir(e.From, e.Raw) {
+		// broken. The same holds for an extensionless file nothing indexed,
+		// such as LICENSE.
+		if e.Kind == chunk.LinkMarkdown &&
+			(g.resolver.IsDir(e.From, e.Raw) || g.resolver.IsUnindexedFile(e.From, e.Raw)) {
 			continue
 		}
 		out = append(out, e)
@@ -249,6 +251,24 @@ func (r *Resolver) IsDir(src, target string) bool {
 		}
 	}
 	return false
+}
+
+// IsUnindexedFile reports whether an extensionless markdown link target names a
+// real file that simply isn't indexed — LICENSE, NOTICE, CODEOWNERS, Makefile.
+// Having no extension is what makes isDocLike treat them as documents, so
+// unlike an asset they reach the broken check, and Resolve finds nothing
+// because nothing indexed them. The link renders on GitHub like any other, so
+// reporting it broken would flag the LICENSE link in every Apache-2.0 repo.
+//
+// Only the extensionless case is checked. A target that carries an extension is
+// either indexed or deliberately skipped as an asset, and neither needs a stat.
+func (r *Resolver) IsUnindexedFile(src, target string) bool {
+	if r.root == "" || path.Ext(target) != "" {
+		return false
+	}
+	cand := r.candidate(src, target)
+	info, err := os.Stat(filepath.Join(r.root, filepath.FromSlash(cand)))
+	return err == nil && info.Mode().IsRegular()
 }
 
 // Resolve returns the indexed file a raw target points at, or "" if none.

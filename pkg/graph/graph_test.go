@@ -213,6 +213,51 @@ func TestGraph_OnDiskDirectoryLinkNotBroken(t *testing.T) {
 	}
 }
 
+func TestGraph_OnDiskExtensionlessFileNotBroken(t *testing.T) {
+	t.Parallel()
+	// LICENSE and NOTICE have no extension, so isDocLike treats them as
+	// documents and they reach the broken check; nothing indexes them, so
+	// resolution finds no file. Every Apache-2.0 repo links to LICENSE from its
+	// README, so without the on-disk stat the flagship hygiene command opens by
+	// reporting a link that works.
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "LICENSE"), []byte("Apache License"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src := &fakeSource{
+		files: []string{"README.md"},
+		links: []index.LinkRow{
+			md("README.md", "LICENSE", chunk.LinkMarkdown), // on disk, unindexed → valid
+			md("README.md", "NOTICE", chunk.LinkMarkdown),  // no such file → broken
+		},
+	}
+	g, err := Build(src, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	broken := g.Broken()
+	if len(broken) != 1 || broken[0].Raw != "NOTICE" {
+		t.Fatalf("broken = %+v, want just NOTICE", broken)
+	}
+}
+
+func TestGraph_ExtensionlessFileNeedsAKnownRoot(t *testing.T) {
+	t.Parallel()
+	// With no vault root there is nothing to stat, so the link stays broken
+	// rather than being waved through on a guess.
+	src := &fakeSource{
+		files: []string{"README.md"},
+		links: []index.LinkRow{md("README.md", "LICENSE", chunk.LinkMarkdown)},
+	}
+	g, err := Build(src, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if broken := g.Broken(); len(broken) != 1 {
+		t.Fatalf("broken = %+v, want LICENSE flagged when no root is known", broken)
+	}
+}
+
 func TestBuild_ExcludesCodeRefs(t *testing.T) {
 	t.Parallel()
 	src := &fakeSource{

@@ -83,7 +83,8 @@ func Links(content string) []Link {
 
 	var out []Link
 	var codeRanges [][2]int
-	linkDepth := 0 // >0 while walking a real [text](dest) link's label — its code spans are already linked, not bare mentions
+	var spanRanges [][2]int // inline-code spans, kept apart from codeRanges: they exclude a wikilink, not an ignore directive
+	linkDepth := 0          // >0 while walking a real [text](dest) link's label — its code spans are already linked, not bare mentions
 	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if _, ok := n.(*ast.Link); ok {
 			if entering {
@@ -105,6 +106,9 @@ func Links(content string) []Link {
 				out = append(out, Link{Target: tgt, Anchor: anchor, Kind: LinkMarkdown, Line: lineOf(nodeOffset(n))})
 			}
 		case *ast.CodeSpan:
+			if r, ok := codeSpanRange(node); ok {
+				spanRanges = append(spanRanges, r)
+			}
 			if linkDepth > 0 {
 				return ast.WalkContinue, nil
 			}
@@ -115,8 +119,14 @@ func Links(content string) []Link {
 		return ast.WalkContinue, nil
 	})
 
+	// Wikilinks are found by scanning the raw source, because goldmark has no
+	// node for them. That bypasses everything the AST already knows about where
+	// code sits, so both kinds of code have to be excluded by offset: fenced
+	// blocks, and inline spans. Without the latter, prose that documents the
+	// syntax — "`[[wikilink]]` edges" — yields an edge to a note called
+	// "wikilink", which is then reported as broken.
 	for _, m := range wikilinkPattern.FindAllSubmatchIndex(source, -1) {
-		if offsetInRanges(m[0], codeRanges) {
+		if offsetInRanges(m[0], codeRanges) || offsetInRanges(m[0], spanRanges) {
 			continue
 		}
 		if tgt, anchor := wikiTarget(string(source[m[2]:m[3]])); tgt != "" {
@@ -307,6 +317,27 @@ func nodeOffset(n ast.Node) int {
 		}
 	}
 	return 0
+}
+
+// codeSpanRange returns the byte range an inline-code span covers, excluding
+// the backticks, as [start, stop). A CodeSpan holds no segment of its own, so
+// the range spans its text children.
+func codeSpanRange(n ast.Node) ([2]int, bool) {
+	start, stop := -1, -1
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		t, ok := c.(*ast.Text)
+		if !ok {
+			continue
+		}
+		if start < 0 {
+			start = t.Segment.Start
+		}
+		stop = t.Segment.Stop
+	}
+	if start < 0 {
+		return [2]int{}, false
+	}
+	return [2]int{start, stop}, true
 }
 
 // offsetInRanges reports whether off falls within any [start,stop) range.

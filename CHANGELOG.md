@@ -23,6 +23,21 @@ so this is a note about cost rather than an instruction — `semantic index
   JavaScript — the whole set when those strings were written. Neither
   enumerates now: `semantic langs` is the list, and it is built from the
   registry rather than retyped.
+- **A link to `LICENSE` is no longer reported as broken.** An extensionless
+  target is treated as a document rather than an asset, so it reaches the
+  broken-link check, and nothing indexes a file with no extension — so `graph
+  --broken` flagged the `LICENSE` and `NOTICE` links that sit in the README of
+  essentially every open-source repository. A target with no extension that
+  exists on disk is now resolved by a stat, the same escape the check already
+  had for directories.
+- **[reindex]** **A `[[wikilink]]` inside inline code is no longer an edge.**
+  Markdown links are read off the AST, which knows where inline code is;
+  wikilinks are matched over raw source, because goldmark has no node for them,
+  and that scan skipped fenced blocks but not inline spans. Prose documenting
+  the syntax therefore produced a link — semantic's own README reported a
+  broken edge to a note called "wikilink". Only link extraction changes, so the
+  first run after upgrading re-parses edges without re-embedding: seconds, not
+  minutes.
 - **`--force` is no longer described as the way to recover from an upgrade.**
   The flag's help and `CONTRIBUTING.md` both predated automatic rebuilding and
   told users to run a full re-embed that a version stamp already handles.

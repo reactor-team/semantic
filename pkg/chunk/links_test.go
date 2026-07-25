@@ -205,6 +205,43 @@ func TestLinks_CodePaths_NotInsideRealLink(t *testing.T) {
 	}
 }
 
+func TestLinks_WikilinkInsideCodeSpanIsNotAnEdge(t *testing.T) {
+	t.Parallel()
+	// Wikilinks are matched over raw source, so nothing about the AST's view of
+	// inline code applies unless it is applied by offset. Documenting the syntax
+	// is the case that exposes it: semantic's own README describes `[[wikilink]]`
+	// edges, and reported a broken link to a note called "wikilink".
+	content := "The `graph` command resolves `[[wikilink]]` edges at query time.\n\n" +
+		"A real one is [[actual-note]] here.\n"
+
+	var wiki []string
+	for _, l := range Links(content) {
+		if l.Kind == LinkWiki {
+			wiki = append(wiki, l.Target)
+		}
+	}
+	if len(wiki) != 1 || wiki[0] != "actual-note" {
+		t.Errorf("wiki targets = %v, want only actual-note", wiki)
+	}
+}
+
+func TestLinks_WikilinkInsideFencedBlockIsNotAnEdge(t *testing.T) {
+	t.Parallel()
+	// The fenced-block half of the same rule, which already held — pinned so a
+	// change to how either kind of code is excluded cannot quietly drop it.
+	content := "Example:\n\n```\n[[not-an-edge]]\n```\n\nBut [[real-note]] is one.\n"
+
+	var wiki []string
+	for _, l := range Links(content) {
+		if l.Kind == LinkWiki {
+			wiki = append(wiki, l.Target)
+		}
+	}
+	if len(wiki) != 1 || wiki[0] != "real-note" {
+		t.Errorf("wiki targets = %v, want only real-note", wiki)
+	}
+}
+
 func TestLinks_IgnoreDirectives(t *testing.T) {
 	t.Parallel()
 	content := "# T\n" + // 1

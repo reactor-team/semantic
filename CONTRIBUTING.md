@@ -259,9 +259,14 @@ fix — it keeps the codebase readable by the next person.
 Maintainers only. Push a `v*` tag and the release workflow does the rest:
 
 ```bash
-git tag -s v0.1.0 -m v0.1.0
+git tag -a v0.1.0 -m v0.1.0
 git push origin v0.1.0
 ```
+
+Use `-s` instead if you have a signing key configured; every release so far is
+annotated and unsigned, and the workflow does not check either way. What a
+consumer can actually verify is the build-provenance attestation on each
+archive, described at the end of this section.
 
 The tag becomes the version stamped into the binary, so move the `[Unreleased]`
 section of [CHANGELOG.md](CHANGELOG.md) under the new heading *before* tagging.

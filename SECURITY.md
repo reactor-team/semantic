@@ -5,7 +5,7 @@
 Do not open a public issue for a security problem.
 
 Report it privately through [GitHub Security Advisories](https://github.com/reactor-team/semantic/security/advisories/new),
-or by email to **team@reactor.inc**.
+or by email to **security@reactor.inc**.
 
 Include what you have: the version (`semantic --version`), the platform, the
 steps to reproduce, and what an attacker gains. A rough report today beats a

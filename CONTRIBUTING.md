@@ -15,6 +15,7 @@ good change looks like, and how to submit one.
   - End-to-end scripts
 - Adding a dependency
 - Commit sign-off (DCO)
+  - Licensing of contributions
 - Submitting a pull request
 - Releasing
 - Reporting bugs

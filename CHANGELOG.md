@@ -16,6 +16,12 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-07-25
+
+Four corrections to what semantic says, three of them user-facing. Nothing
+changes how content is chunked or embedded, so no index is re-embedded; the
+link-extractor bump re-parses edges on the first run, which is seconds.
+
 ### Fixed
 
 - **`--help` no longer names three languages out of eighteen.** The root
@@ -45,6 +51,12 @@ so this is a note about cost rather than an instruction — `semantic index
   contributor bumping `chunkVersion` or `linkVersion` when they change what
   those cover — the step that, if skipped, leaves every existing index holding
   rows the new code would never produce.
+
+### Build and release
+
+- The GitHub Actions used by CI and the release workflow moved to their current
+  majors. This is the first release whose archives and provenance attestation
+  are produced by them.
 
 ## [0.1.1] — 2026-07-25
 
@@ -166,6 +178,7 @@ Initial public release.
   build-provenance attestation. The archives carry the binary only; `semantic
   init` fetches the model and runtime on first use.
 
-[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/reactor-team/semantic/releases/tag/v0.1.2
 [0.1.1]: https://github.com/reactor-team/semantic/releases/tag/v0.1.1
 [0.1.0]: https://github.com/reactor-team/semantic/releases/tag/v0.1.0

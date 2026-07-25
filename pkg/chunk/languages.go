@@ -4,9 +4,10 @@
 // in node names and almost nothing else, so each is a table entry rather than
 // a file.
 //
-// Go, TypeScript, and Python keep hand-written walkers. That is not an
-// oversight — each has a quirk the table cannot express without growing a flag
-// that only one caller sets: Go qualifies methods by a receiver buried under a
+// Go, TypeScript, Python, Bash, HCL, Protobuf, and YAML keep hand-written
+// walkers. That is not an oversight — each has a quirk the table cannot
+// express without growing a flag that only one caller sets: Go qualifies
+// methods by a receiver buried under a
 // pointer and type arguments, TypeScript has to recognise CommonJS export
 // assignments and function-valued consts, and Python keeps its documentation
 // *inside* the body rather than above the declaration. A table is the right

@@ -946,7 +946,7 @@ type CLI struct {
 	Globals
 
 	Init    InitCmd          `cmd:"" help:"Download the embedding model + ONNX runtime (~120MB, one-time)."`
-	Index   IndexCmd         `cmd:"" help:"Index/reindex markdown + code (Go, TypeScript, JavaScript) under the vault (--vault, default cwd)."`
+	Index   IndexCmd         `cmd:"" help:"Index/reindex markdown + code under the vault (--vault, default cwd)."`
 	Search  SearchCmd        `cmd:"" help:"Semantic search over the index."`
 	Langs   LangsCmd         `cmd:"" help:"List the languages --lang accepts."`
 	Dupes   DupesCmd         `cmd:"" help:"Report near-duplicate chunks (redundant docs/guidance)."`
@@ -985,7 +985,7 @@ func main() {
 	ctx := kong.Parse(
 		&cli,
 		kong.Name("semantic"),
-		kong.Description("Semantic search over a directory of markdown and source (Go, TypeScript, JavaScript), backed by a local index."),
+		kong.Description("Semantic search over a directory of markdown and source code, backed by a local index. Run 'semantic langs' for the languages it parses."),
 		kong.UsageOnError(),
 		kong.Vars{"version": versionString()},
 	)

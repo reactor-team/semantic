@@ -16,6 +16,14 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--help` no longer names three languages out of eighteen.** The root
+  description and the `index` command both still listed Go, TypeScript, and
+  JavaScript — the whole set when those strings were written. Neither
+  enumerates now: `semantic langs` is the list, and it is built from the
+  registry rather than retyped.
+
 ## [0.1.1] — 2026-07-25
 
 ### Changed

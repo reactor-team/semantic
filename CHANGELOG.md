@@ -30,6 +30,10 @@ so this is a note about cost rather than an instruction — `semantic index
 - **The DCO sign-off is enforced.** It was documented but nothing checked it. A
   CI job now fails a pull request carrying a commit without a `Signed-off-by`
   trailer, matching how the other public repositories gate merges.
+- **No standalone `SECURITY.md`.** The reporting policy moved into
+  `CONTRIBUTING.md`, matching the org's other public repositories, which keep
+  one contributor-facing document rather than two. Nothing was dropped: the
+  threat model's contributor-facing parts moved with it.
 
 ### Fixed
 

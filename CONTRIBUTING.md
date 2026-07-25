@@ -19,7 +19,7 @@ good change looks like, and how to submit one.
 - Submitting a pull request
 - Releasing
 - Reporting bugs
-- Security issues
+- Reporting security issues
 
 ## Ground rules
 
@@ -270,6 +270,21 @@ actionable:
 2. `semantic --version` and `semantic status`.
 3. A minimal file that reproduces it, if the bug involves chunking or linting.
 
-## Security issues
+## Reporting security issues
 
-Do not open a public issue. See [SECURITY.md](SECURITY.md).
+Please do **not** open a public issue for a security vulnerability. Report it
+through [GitHub Security Advisories](https://github.com/reactor-team/semantic/security/advisories/new)
+or email `security@reactor.inc`. We'll coordinate disclosure and a fix, and
+credit you in the advisory unless you ask us not to.
+
+Include the version (`semantic --version`), the platform, the steps to
+reproduce, and what an attacker gains. A rough report today beats a polished one
+next month.
+
+Every changed file is parsed by tree-sitter, which is C compiled into the
+binary, so a crafted input that causes a crash, a hang, or memory corruption is
+a legitimate finding — send the file. When the cause turns out to be an upstream
+grammar rather than our query or our usage, we'll help route it there.
+
+The latest tagged release receives fixes. This project has not reached 1.0, so
+there are no long-term support branches.

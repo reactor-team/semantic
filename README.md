@@ -230,7 +230,8 @@ the house style, and the DCO sign-off; adding a language is the cheapest place
 to start and is documented there. Behaviour in every project space is governed
 by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-For a security problem, do not open an issue — see [SECURITY.md](SECURITY.md).
+For a security problem, do not open an issue — see
+[Reporting security issues](CONTRIBUTING.md#reporting-security-issues).
 
 ## License
 

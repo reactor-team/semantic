@@ -6,7 +6,8 @@ body:
     attributes:
       value: |
         Thanks for the report. If this is a security problem, stop here and
-        follow [SECURITY.md](../blob/main/SECURITY.md) instead — do not file it
+        follow [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md#reporting-security-issues)
+        instead — do not file it
         publicly.
 
   - type: textarea

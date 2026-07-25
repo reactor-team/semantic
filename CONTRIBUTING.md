@@ -131,10 +131,28 @@ writing all of that again and picking a side for every language after it.
 
 ### Changing the chunker
 
-Chunk keys are content addresses. If you change how a chunk is keyed, existing
-indexes silently keep stale rows, and users need `semantic index --force` to
-recover. Call that out in your pull request description so it reaches the
-changelog.
+Chunk keys are content addresses, so a chunker change makes existing rows wrong
+for files whose bytes never changed. Content-hash diffing cannot see that: every
+hash still matches, and a plain `semantic index` would skip the whole vault.
+
+The index guards against this by storing a stamp of what built it, so **bump the
+matching version in [`pkg/index/representation.go`](/pkg/index/representation.go)
+in the same change**:
+
+| You changed | Bump | Cost of the rebuild |
+|---|---|---|
+| Any chunker, or the markdown simplifier they share | `chunkVersion` | Re-chunks and re-embeds the whole vault — minutes on a large one. |
+| Link extraction — which edges a file yields, or their targets, anchors, kinds, or lines | `linkVersion` | Re-parses edges, touches no vectors — seconds. |
+
+Bump only what actually changed; the two are separate because they cost
+different amounts to redo. Then mark the changelog entry **[reindex]**, which is
+what tells a user the first run after upgrading will be slow.
+
+Forgetting the bump is the failure this machinery exists to prevent, and nothing
+catches it for you: the build passes, the tests pass, and every existing index
+silently keeps rows the new code would never produce. Users do not need
+`semantic index --force` — a stamp mismatch rebuilds automatically — but that is
+only true if you bumped the stamp.
 
 ## Tests
 

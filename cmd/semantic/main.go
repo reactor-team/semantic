@@ -126,15 +126,17 @@ func (c *InitCmd) Run(_ *Globals) error {
 
 // IndexCmd incrementally (re)builds the index for the vault (--vault, default
 // cwd) — the same root every other command resolves against. Both markdown and
-// source code (.go, .ts/.tsx, .js/.jsx, by AST) are indexed. Reindex is a whole-tree sync (it prunes
-// DB rows it no longer sees), so the indexed tree is the vault, not a subtree —
-// hence no separate directory argument. --force re-chunks, re-embeds, and
-// re-extracts links for every file even when its content is unchanged — the
-// escape hatch for when a semantic upgrade changes what the chunker or link
-// extractor does with the same bytes (content-hash diffing has no way to know
-// that on its own).
+// source code are indexed, the latter by AST. Reindex is a whole-tree sync (it
+// prunes DB rows it no longer sees), so the indexed tree is the vault, not a
+// subtree — hence no separate directory argument. --force re-chunks,
+// re-embeds, and re-extracts links for every file even when its content is
+// unchanged. An upgrade that changes chunking, link extraction, or the
+// embedding model is detected from the stamps in the index and redone without
+// it (see pkg/index/representation.go), so this is the manual override for
+// when that detection cannot help: a chunker being changed locally without a
+// version bump, or an index suspected of being damaged.
 type IndexCmd struct {
-	Force bool `help:"Re-chunk, re-embed, and re-extract links for every file, even unchanged ones — use after a semantic upgrade changes chunking/link-extraction behavior."`
+	Force bool `help:"Re-chunk, re-embed, and re-extract links for every file, even unchanged ones. An upgrade rebuilds what it needs on its own; this is the manual override."`
 }
 
 func (c *IndexCmd) Run(g *Globals) error {

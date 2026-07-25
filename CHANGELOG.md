@@ -23,6 +23,13 @@ so this is a note about cost rather than an instruction — `semantic index
   JavaScript — the whole set when those strings were written. Neither
   enumerates now: `semantic langs` is the list, and it is built from the
   registry rather than retyped.
+- **`--force` is no longer described as the way to recover from an upgrade.**
+  The flag's help and `CONTRIBUTING.md` both predated automatic rebuilding and
+  told users to run a full re-embed that a version stamp already handles.
+  `CONTRIBUTING.md` now states the obligation that actually exists, which is a
+  contributor bumping `chunkVersion` or `linkVersion` when they change what
+  those cover — the step that, if skipped, leaves every existing index holding
+  rows the new code would never produce.
 
 ## [0.1.1] — 2026-07-25
 

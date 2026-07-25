@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // Package graph builds the document link graph from the stored link edges:
 // it resolves each raw link target (a relative path or a wikilink) against the
 // set of indexed files, then answers the questions worth asking of a docs

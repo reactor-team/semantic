@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file makes an upgrade safe. The incremental reindexer decides what to
 // redo by comparing content hashes, which answers "did this file change?" and
 // cannot answer "would this file produce different chunks now?". When a release

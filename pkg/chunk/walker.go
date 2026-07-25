@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file holds the machinery every tree-sitter chunker shares, so adding a
 // language is a walk plus an emit rather than a parser.
 //

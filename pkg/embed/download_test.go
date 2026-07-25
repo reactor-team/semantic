@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // These tests never reach the network. Archives are synthesized in memory and
 // downloads are served by httptest, so the suite runs offline and does not
 // depend on a GitHub release or a Hugging Face repository staying put.

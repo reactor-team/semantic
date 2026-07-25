@@ -1,6 +1,4 @@
 #!/bin/bash
-# Copyright (c) 2026 Reactor Technologies, Inc.
-# SPDX-License-Identifier: Apache-2.0
 #MISE description="[Compliance] Scan dependencies for known vulnerabilities"
 set -euo pipefail
 

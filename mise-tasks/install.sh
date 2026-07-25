@@ -1,6 +1,4 @@
 #!/bin/bash
-# Copyright (c) 2026 Reactor Technologies, Inc.
-# SPDX-License-Identifier: Apache-2.0
 #MISE description="[Build] go install semantic into GOPATH/bin (global CLI)"
 set -euo pipefail
 

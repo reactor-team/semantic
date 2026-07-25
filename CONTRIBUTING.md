@@ -63,7 +63,7 @@ CI's.
 | `mise run lint` | `golangci-lint` over the module, `shellcheck` over the task scripts, `actionlint` over the workflows. |
 | `mise run fmt` | `gofumpt -w` plus import grouping. |
 | `mise run deps` | Download modules and verify `go.mod` and `go.sum` are tidy. |
-| `mise run licenses` | Fail if a dependency is copyleft or a file lost its SPDX header. |
+| `mise run licenses` | Fail if a dependency is copyleft or the license files are damaged. |
 
 Run `mise run fmt && mise run lint && mise run test` before you open a pull
 request. CI runs those three plus `licenses`, and will reject a change that
@@ -197,11 +197,32 @@ Add the sign-off with `git commit -s`, which appends:
 Signed-off-by: Your Name <your.email@example.com>
 ```
 
-The name and email must be real and must match your commit author. Amend a
-commit you forgot to sign with `git commit --amend -s`.
+The name and email must be real and must match your commit author. Pseudonymous
+and anonymous contributions are not accepted, because the trailer is the record
+of who granted the licence.
+
+Amend a commit you forgot to sign with `git commit --amend -s`, or a whole
+branch with `git rebase --signoff main`. Either needs
+`git push --force-with-lease` afterwards.
+
+CI checks every commit on a pull request and blocks the merge until each one
+carries the trailer.
+
+### Licensing of contributions
+
+No source file carries a copyright or SPDX header. The root
+[`LICENSE`](LICENSE) and [`NOTICE`](NOTICE) cover the whole tree, so a new file
+needs no comment of its own — this matches the other public repositories in the
+org, and it keeps a header out of every diff that adds a file.
+
+`NOTICE` is the exception that has to stay detailed. The tree-sitter runtime
+and every grammar are C compiled into the binary, and their licences require
+that attribution travel with what ships, so it is listed there rather than
+inferred from `go.mod`.
 
 Contributions are accepted under [Apache-2.0](LICENSE), per section 5 of that
-license. You keep the copyright on what you write.
+license. You keep the copyright on what you write; your `Signed-off-by` trailer
+is the only attestation needed.
 
 ## Submitting a pull request
 

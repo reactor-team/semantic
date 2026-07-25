@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // Package index is the local index: a SQLite store of markdown files and
 // their embedded chunks, plus the incremental (re)indexer that keeps it in
 // sync with a directory tree. The driver is modernc.org/sqlite (pure Go —

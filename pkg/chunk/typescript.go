@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file extends the chunker to TypeScript, the same way gosource.go
 // extends it to Go: one chunk per documented symbol — function, class (+ its
 // methods), interface, type alias, enum, and documented top-level const/var.

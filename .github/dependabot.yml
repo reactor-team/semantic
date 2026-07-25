@@ -1,6 +1,3 @@
-# Copyright (c) 2026 Reactor Technologies, Inc.
-# SPDX-License-Identifier: Apache-2.0
-#
 # Two ecosystems, both grouped into a single weekly pull request each. Ungrouped
 # updates on a small repo produce more review load than they retire, and the
 # license gate in CI already blocks the failure mode that matters — a bump that

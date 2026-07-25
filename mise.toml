@@ -1,6 +1,3 @@
-# Copyright (c) 2026 Reactor Technologies, Inc.
-# SPDX-License-Identifier: Apache-2.0
-#
 # semantic is a standalone repo (its own go.mod under the reactor-team org), not
 # part of the reactor monorepo — so this is a plain single-module mise config,
 # not monorepo mode. It mirrors the reactor tooling-module conventions:

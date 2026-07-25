@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // Command semantic indexes a directory of markdown files and source code and
 // exposes semantic search over them, backed by a local index. See the README
 // for the language set and development conventions.

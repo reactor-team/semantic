@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file chunks YAML. YAML needed a granularity decision the other
 // languages did not, because it has no declarations — only nesting — and the
 // obvious readings are both wrong.

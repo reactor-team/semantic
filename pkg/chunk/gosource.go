@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file extends the chunker to Go source. Where Document walks a markdown
 // heading tree, GoSource walks a Go file's syntax tree and emits one chunk per
 // symbol — package doc, type, func, method, and documented const/var block.

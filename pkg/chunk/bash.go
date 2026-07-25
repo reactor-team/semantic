@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file chunks shell scripts. Build tasks, deploy scripts, and CI helpers
 // accumulate operational knowledge that exists nowhere else — the comment
 // above a function is often the only documentation an operational procedure

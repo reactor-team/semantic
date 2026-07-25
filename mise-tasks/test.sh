@@ -1,6 +1,4 @@
 #!/bin/bash
-# Copyright (c) 2026 Reactor Technologies, Inc.
-# SPDX-License-Identifier: Apache-2.0
 #MISE description="[Testing] Run unit tests with gotestsum"
 set -euo pipefail
 

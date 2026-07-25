@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // Package embed generates sentence embeddings with a local ONNX model
 // (all-MiniLM-L6-v2, 384-dim). Inference runs fully in-process against a
 // single ONNX Runtime session — no network, no API key. The runtime

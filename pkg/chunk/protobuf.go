@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file chunks Protocol Buffers. A `.proto` file is the closest thing a
 // service-oriented codebase has to an API reference, and the comments above a
 // message, an rpc, or an enum are that reference's prose — so they are worth

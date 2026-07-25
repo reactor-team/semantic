@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // Package lint surfaces docs-hygiene issues the link graph proper doesn't.
 // Two checks: doc references written as inline code (`docs/design.md`) rather
 // than as [text](path) links — which never become graph edges, so a doc only

@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // Package toc generates a committed "## Contents" table of contents for a
 // markdown file from its heading tree. Unlike a Claude Code `!command`
 // substitution — which runs only at context-load time in slash-command/SKILL

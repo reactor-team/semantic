@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file is the one place a file extension is mapped to a language. Both
 // the indexer (which needs the chunker) and search (which needs the language
 // name for `--lang`) read it, so the set of indexed extensions and the set of

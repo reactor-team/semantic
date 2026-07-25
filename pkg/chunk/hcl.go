@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file chunks HCL — Terraform, Terragrunt, Packer, and Nomad
 // configuration. Infrastructure is where "why is it configured this way"
 // questions are hardest to answer by grep, because the answer is usually in a

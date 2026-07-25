@@ -216,7 +216,7 @@ Three more tasks gate a pull request, all of them also run in CI:
 
 ```bash
 mise run vuln       # govulncheck — CVEs reachable from this module
-mise run licenses   # no copyleft dependency, no missing SPDX header
+mise run licenses   # no copyleft dependency, license files intact
 mise run deps       # go.mod and go.sum are tidy
 ```
 

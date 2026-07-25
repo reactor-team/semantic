@@ -1,7 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2026 Reactor Technologies, Inc.
-# SPDX-License-Identifier: Apache-2.0
-#MISE description="[Compliance] Fail if a dependency is copyleft or a file lost its SPDX header"
+#MISE description="[Compliance] Fail if a dependency is copyleft or the license files are damaged"
 set -euo pipefail
 
 # This is the license-defensibility gate. semantic ships under Apache-2.0, and
@@ -108,25 +106,23 @@ EOF
 fi
 echo "    all dependencies permissive"
 
-echo "==> checking SPDX headers"
-missing=0
-while IFS= read -r f; do
-  if ! head -4 "$f" | grep -q 'SPDX-License-Identifier: Apache-2.0'; then
-    echo "    missing SPDX header: $f" >&2
-    missing=1
+echo "==> checking the license files"
+# No source file carries its own header: the root LICENSE and NOTICE cover the
+# whole tree, matching the convention in the org's other public repositories.
+# That only holds while the pair is actually present and still says what it
+# should, so the per-file check is replaced by an integrity check on the two.
+for f in LICENSE NOTICE; do
+  if [[ ! -s "$f" ]]; then
+    echo "    missing or empty: $f" >&2
+    exit 1
   fi
-done < <(git ls-files '*.go' '*.sh' 'mise.toml')
-
-if [[ "$missing" == "1" ]]; then
-  cat >&2 <<'EOF'
-
-Every source file declares its own license grant, so a file copied out of this
-repo carries its terms with it. Add these two lines at the top (after the
-shebang, if there is one):
-
-  // Copyright (c) 2026 Reactor Technologies, Inc.
-  // SPDX-License-Identifier: Apache-2.0
-EOF
+done
+if ! grep -q "Apache License" LICENSE; then
+  echo "    LICENSE is no longer the Apache License text" >&2
   exit 1
 fi
-echo "    all source files carry an SPDX header"
+if ! grep -q "Reactor Technologies" NOTICE; then
+  echo "    NOTICE lost its attribution" >&2
+  exit 1
+fi
+echo "    LICENSE and NOTICE intact"

@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // Package search runs a semantic query against the index: embed the query,
 // cosine-rank it against every stored chunk, and return the top matches.
 // At personal-vault scale a brute-force scan in memory is well under a

@@ -1,6 +1,4 @@
 #!/bin/bash
-# Copyright (c) 2026 Reactor Technologies, Inc.
-# SPDX-License-Identifier: Apache-2.0
 #MISE description="[Build] Build the semantic binary into bin/"
 set -euo pipefail
 

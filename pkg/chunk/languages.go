@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file chunks the languages whose declarations all have the same shape: a
 // named node, optionally holding members, documented by the comment group
 // directly above it. Java, C#, Rust, C, C++, Ruby, PHP, Scala, and Lua differ

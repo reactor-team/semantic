@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // Package chunk splits a markdown file into retrievable units for
 // embedding, via a heading-tree walk that emits /path·/narrow·/full
 // variants with slugified keys. Notable design choices:

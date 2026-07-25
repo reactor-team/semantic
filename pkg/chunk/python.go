@@ -1,6 +1,3 @@
-// Copyright (c) 2026 Reactor Technologies, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 // This file chunks Python. Python gets a hand-written walker rather than a
 // table entry (see languages.go) for one reason: its documentation lives
 // *inside* the declaration, not above it. A docstring is the first statement

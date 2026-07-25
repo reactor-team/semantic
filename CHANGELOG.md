@@ -18,6 +18,19 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [0.1.1] — 2026-07-25
 
+### Changed
+
+- **No per-file copyright or SPDX headers.** The root `LICENSE` and `NOTICE`
+  cover the tree, which is the convention the org's other public repositories
+  already follow. Removing them takes a two-line preamble off the top of every
+  source file and out of every diff that adds one; `mise run licenses` now
+  checks that the two license files are intact instead of policing headers.
+  `NOTICE` keeps its detail — the statically linked C grammars require their
+  attribution to ship with the binary.
+- **The DCO sign-off is enforced.** It was documented but nothing checked it. A
+  CI job now fails a pull request carrying a commit without a `Signed-off-by`
+  trailer, matching how the other public repositories gate merges.
+
 ### Fixed
 
 - **The ONNX Runtime and its Go binding now move as a pair.** The binding
@@ -97,11 +110,12 @@ Initial public release.
 
 ### Build and release
 
-- Apache-2.0, with a `NOTICE` and per-file SPDX headers. The tree-sitter
-  runtime and every grammar are C compiled into the binary, so their
-  attribution ships with each release rather than being fetched at run time.
+- Apache-2.0, with the root `LICENSE` and `NOTICE` covering the tree. The
+  tree-sitter runtime and every grammar are C compiled into the binary, so
+  their attribution ships in `NOTICE` with each release rather than being
+  fetched at run time.
 - `mise run licenses` fails the build if a dependency carries a copyleft or
-  unclassifiable license, or if a source file lost its SPDX header.
+  unclassifiable license, or if the license files are damaged.
 - `mise run lint` covers Go (`golangci-lint`, including `gosec` and `revive`'s
   `exported` rule), shell (`shellcheck`), and workflows (`actionlint`).
 - Unit tests plus end-to-end scripts (`cmd/semantic/testdata/*.txtar`) that run

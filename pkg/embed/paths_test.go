@@ -65,7 +65,7 @@ func TestModelCacheDir(t *testing.T) {
 	if got := ModelCacheDir(); got != want {
 		t.Errorf("ModelCacheDir() = %q, want %q", got, want)
 	}
-	if got, want := OrtCacheDir(), filepath.Join(root, "onnxruntime"); got != want {
+	if got, want := OrtCacheDir(), filepath.Join(root, "onnxruntime", OrtVersion); got != want {
 		t.Errorf("OrtCacheDir() = %q, want %q", got, want)
 	}
 
@@ -77,8 +77,28 @@ func TestModelCacheDir(t *testing.T) {
 	if got := ModelCacheDir(); got != explicit {
 		t.Errorf("ModelCacheDir() = %q, want %q", got, explicit)
 	}
-	if got, want := OrtCacheDir(), filepath.Join(root, "onnxruntime"); got != want {
+	if got, want := OrtCacheDir(), filepath.Join(root, "onnxruntime", OrtVersion); got != want {
 		t.Errorf("SEMANTIC_MODEL_DIR moved the ORT dir too: %q, want %q", got, want)
+	}
+}
+
+// The ORT cache path carries the version, so upgrading the binding does not
+// find a library from the previous release sitting where the new one belongs.
+// Without this, DownloadOrt's "already cached" short-circuit would skip the
+// download and the next embed would fail inside the C API.
+func TestOrtCacheDir_IsVersioned(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("SEMANTIC_CACHE_DIR", root)
+
+	dir := OrtCacheDir()
+	if !strings.Contains(dir, OrtVersion) {
+		t.Errorf("OrtCacheDir() = %q, want the version %q in the path", dir, OrtVersion)
+	}
+	// A library cached for a different release is not mistaken for this one.
+	t.Setenv("SEMANTIC_ORT_LIB", "")
+	touch(t, filepath.Join(root, "onnxruntime", "0.0.1", OrtLibFilename()))
+	if got := findOrtLib(); got != "" {
+		t.Errorf("findOrtLib() = %q, want no match for a differently-versioned cache", got)
 	}
 }
 
@@ -106,7 +126,7 @@ func TestFindOrtLib_PrefersCache(t *testing.T) {
 	t.Setenv("SEMANTIC_CACHE_DIR", root)
 	t.Setenv("SEMANTIC_ORT_LIB", "")
 
-	lib := touch(t, filepath.Join(root, "onnxruntime", OrtLibFilename()))
+	lib := touch(t, filepath.Join(OrtCacheDir(), OrtLibFilename()))
 	if got := findOrtLib(); got != lib {
 		t.Errorf("findOrtLib() = %q, want the cached library %q", got, lib)
 	}
@@ -116,7 +136,7 @@ func TestFindOrtLib_ExplicitOverride(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("SEMANTIC_CACHE_DIR", root)
 
-	cached := touch(t, filepath.Join(root, "onnxruntime", OrtLibFilename()))
+	cached := touch(t, filepath.Join(OrtCacheDir(), OrtLibFilename()))
 	override := touch(t, filepath.Join(t.TempDir(), "custom-onnxruntime"))
 	t.Setenv("SEMANTIC_ORT_LIB", override)
 	if got := findOrtLib(); got != override {

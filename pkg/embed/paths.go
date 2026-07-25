@@ -62,8 +62,15 @@ func ModelCacheDir() string {
 }
 
 // OrtCacheDir returns the directory where the ONNX Runtime library is cached.
+//
+// The version is part of the path. The binding is compiled against one release
+// of the C API and will not load a library from another, so a single
+// unversioned path would make an upgrade find the old file already present,
+// skip the download, and fail at the first embed with "Error setting ORT API
+// base". Keying by version makes the upgrade fetch what it needs and leaves
+// the superseded library sitting harmlessly beside it.
 func OrtCacheDir() string {
-	return filepath.Join(cacheRoot(), "onnxruntime")
+	return filepath.Join(cacheRoot(), "onnxruntime", OrtVersion)
 }
 
 // OrtLibFilename returns the platform-appropriate shared library filename.

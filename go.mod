@@ -1,6 +1,6 @@
 module github.com/reactor-team/semantic
 
-go 1.26.0
+go 1.26.5
 
 require (
 	github.com/alecthomas/kong v1.16.0

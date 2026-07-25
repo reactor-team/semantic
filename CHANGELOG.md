@@ -1,3 +1,5 @@
+<!-- semantic-ignore-file: a changelog is a reverse-chronological log, not a document with sections to navigate; a Contents table of version numbers would need regenerating every release and would help nobody -->
+
 # Changelog
 
 All notable changes to this project are documented here.
@@ -13,6 +15,34 @@ so this is a note about cost rather than an instruction — `semantic index
 --force` is the manual escape hatch.
 
 ## [Unreleased]
+
+## [0.1.1] — 2026-07-25
+
+### Fixed
+
+- **The ONNX Runtime and its Go binding now move as a pair.** The binding
+  compiles against one release of the C API and loads whatever `semantic init`
+  downloaded, so the two versions are not independent. They had drifted: the
+  binding expected 1.26.0 and the download fetched 1.24.1, which fails at the
+  first embed with `Error setting ORT API base`. Nothing in the test suite
+  catches this — inference is skipped when no model is installed — so the two
+  are now changed in the same commit or not at all.
+- **The runtime is cached per version.** The cache held one unversioned path,
+  and the download is skipped when the file is already there, so an upgrade
+  would have found the superseded library sitting where the new one belonged
+  and never replaced it. Upgrading from 0.1.0 leaves a ~37 MB library behind at
+  the old path; it is inert and safe to delete.
+- **The Go toolchain resolves to the pinned version.** mise reads `go.mod` in
+  preference to `.go-version`, so a `go` directive below the pin selected an
+  older toolchain in CI without saying so — surfacing as a license check that
+  refused to run and fourteen standard-library vulnerabilities already fixed in
+  the pinned release. The two files are now held equal, and `mise run deps`
+  fails when they diverge.
+
+Embeddings are unchanged by the runtime upgrade — bit-identical to 0.1.0 — so
+no index is rebuilt.
+
+## [0.1.0] — 2026-07-25
 
 Initial public release.
 
@@ -88,4 +118,6 @@ Initial public release.
   build-provenance attestation. The archives carry the binary only; `semantic
   init` fetches the model and runtime on first use.
 
-[Unreleased]: https://github.com/reactor-team/semantic
+[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/reactor-team/semantic/releases/tag/v0.1.1
+[0.1.0]: https://github.com/reactor-team/semantic/releases/tag/v0.1.0

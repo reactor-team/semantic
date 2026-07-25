@@ -1,0 +1,32 @@
+# Copyright (c) 2026 Reactor Technologies, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Two ecosystems, both grouped into a single weekly pull request each. Ungrouped
+# updates on a small repo produce more review load than they retire, and the
+# license gate in CI already blocks the failure mode that matters — a bump that
+# drags in a copyleft transitive dependency.
+
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"
+
+  # Pinned to major tags in the workflows, so this mostly catches a major bump
+  # that would otherwise sit unnoticed until an action was retired.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"

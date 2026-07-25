@@ -1,0 +1,52 @@
+name: Language support
+description: Request or propose indexing for a language semantic does not parse yet
+labels: ["enhancement", "language"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Source indexing is deliberately cheap to extend: one chunker function,
+        its tests, and an entry in the `chunkers` map. See
+        [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md#adding-a-language).
+
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: Python
+    validations:
+      required: true
+
+  - type: input
+    id: grammar
+    attributes:
+      label: tree-sitter grammar
+      description: >
+        The grammar module and whether it publishes Go bindings. Check with
+        `go list -m -versions github.com/tree-sitter/tree-sitter-<lang>`.
+      placeholder: github.com/tree-sitter/tree-sitter-python v0.25.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: doc-convention
+    attributes:
+      label: Which comment carries the doc
+      description: >
+        Go and TypeScript put it directly above the signature. Python puts the
+        docstring inside the function body, which the body-stripping rule does
+        not anticipate. Say which shape this language uses.
+    validations:
+      required: true
+
+  - type: textarea
+    id: symbols
+    attributes:
+      label: What counts as a symbol
+      description: >
+        Which declarations should become chunks, and which existing `Variant`
+        constants they map to (package/type/func/method/value/class/interface/enum).
+        Propose a new variant only where the language has a concept none of those
+        cover.
+    validations:
+      required: true

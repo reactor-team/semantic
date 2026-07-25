@@ -1,0 +1,65 @@
+semantic
+Copyright (c) 2026 Reactor Technologies, Inc.
+
+This product includes software developed at Reactor Technologies, Inc.
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+--------------------------------------------------------------------------------
+Runtime-downloaded assets
+--------------------------------------------------------------------------------
+
+`semantic init` downloads two third-party artifacts into the OS cache directory.
+Neither is vendored into this repository, and neither ships in the binary.
+
+  all-MiniLM-L6-v2 (ONNX export)
+    Apache License 2.0
+    Model by the Sentence-Transformers authors (UKP Lab, TU Darmstadt).
+    ONNX export by Xenova, distributed via Hugging Face.
+    https://huggingface.co/Xenova/all-MiniLM-L6-v2
+
+  ONNX Runtime
+    MIT License
+    Copyright (c) Microsoft Corporation
+    https://github.com/microsoft/onnxruntime
+
+--------------------------------------------------------------------------------
+Go module dependencies
+--------------------------------------------------------------------------------
+
+Direct and transitive dependencies are declared in go.mod and fetched by the Go
+toolchain. Every one is permissively licensed (MIT, BSD-3-Clause, or Apache-2.0);
+none is copyleft. Their full license texts travel with the modules themselves in
+the module cache. Notable direct dependencies:
+
+  github.com/alecthomas/kong                       MIT
+  github.com/sabhiram/go-gitignore                 MIT
+  github.com/sugarme/tokenizer                     Apache-2.0
+  github.com/yalue/onnxruntime_go                  MIT
+  github.com/yuin/goldmark                         MIT
+  go.yaml.in/yaml/v3                               MIT and Apache-2.0
+  modernc.org/sqlite                               BSD-3-Clause
+
+  github.com/rogpeppe/go-internal                  BSD-3-Clause
+      Used by the end-to-end script tests only; not linked into the binary.
+      https://github.com/rogpeppe/go-internal
+
+The tree-sitter runtime and every grammar are C compiled into the binary, so
+their attribution ships with each release rather than being fetched at run time:
+
+  github.com/tree-sitter/go-tree-sitter            MIT
+  github.com/tree-sitter/tree-sitter-bash          MIT
+  github.com/tree-sitter/tree-sitter-c             MIT
+  github.com/tree-sitter/tree-sitter-c-sharp       MIT
+  github.com/tree-sitter/tree-sitter-cpp           MIT
+  github.com/tree-sitter/tree-sitter-go            MIT
+  github.com/tree-sitter/tree-sitter-java          MIT
+  github.com/tree-sitter/tree-sitter-php           MIT
+  github.com/tree-sitter/tree-sitter-python        MIT
+  github.com/tree-sitter/tree-sitter-ruby          MIT
+  github.com/tree-sitter/tree-sitter-rust          MIT
+  github.com/tree-sitter/tree-sitter-scala         MIT
+  github.com/tree-sitter/tree-sitter-typescript    MIT
+  github.com/tree-sitter-grammars/tree-sitter-hcl  Apache-2.0
+  github.com/tree-sitter-grammars/tree-sitter-lua  MIT
+  github.com/tree-sitter-grammars/tree-sitter-yaml MIT
+  github.com/coder3101/tree-sitter-proto           MIT

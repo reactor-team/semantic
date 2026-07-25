@@ -1,0 +1,132 @@
+# Copyright (c) 2026 Reactor Technologies, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Every job drives mise rather than calling go/golangci-lint directly, so CI and
+# a contributor's laptop run byte-identical tool versions: the Go toolchain from
+# /.go-version, golangci-lint and gotestsum from mise.toml. A job that bypassed
+# mise would drift the moment either pin moved.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A force-push should not leave the superseded run burning a runner.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # onnxruntime_go links -ldl via cgo, so nothing here builds without it.
+  CGO_ENABLED: "1"
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both first-class targets. The chunkers are platform-independent, but
+        # the SQLite driver and the cgo boundary are not, and path handling has
+        # burned this kind of tool before.
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v4
+        with:
+          experimental: true
+
+      - name: Cache Go build and module cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/Library/Caches/go-build
+            ~/go/pkg/mod
+          key: go-${{ matrix.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-${{ matrix.os }}-
+
+      - run: mise run test
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+        with:
+          experimental: true
+      - name: Cache Go build and module cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-lint-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-lint-
+      - run: mise run lint
+
+  tidy:
+    name: go.mod tidy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+        with:
+          experimental: true
+      - run: mise run deps
+
+  vuln:
+    name: vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+        with:
+          experimental: true
+      # govulncheck: fails only on a CVE with a call path reachable from this
+      # module, so a finding here is actionable rather than a version match.
+      - run: mise run vuln
+
+  licenses:
+    name: license compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+        with:
+          experimental: true
+      # Fails on a copyleft or unclassifiable dependency, and on any source file
+      # that lost its SPDX header. See mise-tasks/licenses.sh for the policy.
+      - run: mise run licenses
+
+  build:
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      # The build task stamps a version derived from `git describe`, so it needs
+      # tags, which a default shallow checkout does not fetch.
+      - run: git fetch --tags --force --depth=1 origin || true
+      - uses: jdx/mise-action@v4
+        with:
+          experimental: true
+      - run: mise run build
+      - name: Smoke-test the binary
+        # The build task names the binary for the host, so the path is derived
+        # rather than globbed — a glob would silently pick one of several if a
+        # stale build were ever left behind.
+        run: |
+          set -euo pipefail
+          "./bin/semantic_$(go env GOOS)-$(go env GOARCH)" --version

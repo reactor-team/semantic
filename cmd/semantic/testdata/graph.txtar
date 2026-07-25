@@ -1,0 +1,59 @@
+# The link graph, read back from an index built without embedding.
+#
+# `--no-reindex` is what makes this possible: the graph commands otherwise
+# reindex first, and reindexing embeds. Here lint builds the index, and every
+# graph query answers from it. That pairing is also how a large repository
+# keeps `graph` fast — the graph never reads a vector.
+
+env SEMANTIC_CACHE_DIR=$WORK/cache
+
+# Build the index. lint is only the vehicle: it is the one command that
+# populates the index without embedding. This vault is clean, so it exits 0.
+semantic lint --no-embed
+stdout 'no lint issues flagged'
+
+semantic graph --no-reindex
+stdout '^files:    3 \(3 markdown\)$'
+stdout 'broken'
+stdout '^orphans:  1$'
+
+# A link whose target does not exist is reported with the file and line that
+# holds it, so it is editor-openable straight from the output.
+semantic graph --broken --no-reindex
+stdout '^docs/guide\.md:5\t/nope\.md\t\(md\)$'
+! stdout 'README\.md'
+
+# An orphan is a markdown file nothing links to. README links to the guide and
+# the guide links back, so the stray note is the only one.
+semantic graph --orphans --no-reindex
+stdout '^notes/stray\.md$'
+! stdout 'guide\.md'
+
+# Backlinks answer the reverse question, and name the kind of link as well as
+# its position — the reason a rename is safe or is not.
+semantic graph --backlinks README.md --no-reindex
+stdout '^docs/guide\.md:3\t\(md\)$'
+
+# A path with no inbound links says so rather than printing nothing. Silence
+# would be indistinguishable from a command that failed to run.
+semantic graph --backlinks notes/stray.md --no-reindex
+stdout 'no backlinks to notes/stray\.md'
+
+# The global flag reaches the subcommand from either side of it.
+semantic --no-reindex graph --orphans
+stdout '^notes/stray\.md$'
+
+-- README.md --
+# Project
+
+See [the guide](docs/guide.md) for details.
+-- docs/guide.md --
+# Guide
+
+Back to [the readme](../README.md).
+
+A dead link: [gone](/nope.md).
+-- notes/stray.md --
+# Stray
+
+Nothing links here.

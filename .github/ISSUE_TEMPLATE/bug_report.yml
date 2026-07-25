@@ -1,0 +1,57 @@
+name: Bug report
+description: Something does not work the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If this is a security problem, stop here and
+        follow [SECURITY.md](../blob/main/SECURITY.md) instead — do not file it
+        publicly.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran and the output you got. Paste both.
+      placeholder: |
+        $ semantic search "retry backoff"
+        semantic: <the output>
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: >
+        If the bug involves chunking, linting, or the graph, paste the smallest
+        file that triggers it. A three-line file that reproduces the problem is
+        worth more than a description of a large one.
+    validations:
+      required: false
+
+  - type: textarea
+    id: version
+    attributes:
+      label: Version and environment
+      description: Output of `semantic --version` and `semantic status`.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: macOS 15.3 arm64 / Ubuntu 24.04 amd64
+    validations:
+      required: true

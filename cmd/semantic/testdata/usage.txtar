@@ -1,0 +1,29 @@
+# Argument handling. The wording here belongs to kong, not to this program, so
+# the assertions pin the shape and not the sentence: a non-zero exit, the
+# offending token named, and which stream each half lands on.
+
+env SEMANTIC_CACHE_DIR=$WORK/cache
+
+# --version is a query, not an error: it exits 0 and prints one line to stdout,
+# so `semantic --version` is safe to interpolate into a script.
+semantic --version
+! stderr .
+stdout '.'
+
+# An unknown command fails. The usage text goes to stdout and only the one-line
+# reason to stderr — kong's split, kept because `semantic bogus | head` still
+# shows a reader what the valid commands are.
+! semantic bogus
+stdout 'Usage: semantic'
+stdout 'langs \[flags\]'
+stderr 'bogus'
+
+# search takes its query as a positional argument, so omitting it is a usage
+# error rather than a search for the empty string.
+! semantic search
+stdout 'Usage: semantic'
+stderr 'query'
+
+# An unknown flag is caught rather than passed through as part of the query.
+! semantic search --nope 'x'
+stderr 'nope'

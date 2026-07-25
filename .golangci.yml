@@ -1,0 +1,77 @@
+# golangci-lint v2 config. `version: "2"` is the schema marker.
+# Mirrors the reactor house config: default linter set + a few low-noise extras.
+version: "2"
+
+linters:
+  # standard = errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - misspell   # typos in identifiers, comments, strings
+    - unconvert  # redundant type conversions
+    - gocritic   # diagnostics/style/performance
+    - modernize  # stdlib idioms the current Go release supersedes
+    - gosec      # this tool reads arbitrary files and dlopens a shared library
+    - revive     # only for the exported-symbol doc rule below
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+
+    revive:
+      # Only the exported rule, not revive's default set — gocritic and
+      # staticcheck already cover the style ground, and running both produces
+      # duplicate findings. An undocumented exported symbol is the one thing
+      # neither of them reports, and pkg/ here is a public API.
+      rules:
+        - name: exported
+
+    gosec:
+      # G104 duplicates errcheck, and errcheck's exclusions are the ones tuned
+      # for the cleanup calls this codebase makes.
+      excludes:
+        - G104
+
+  exclusions:
+    rules:
+      # Tests intentionally ignore some return errors and read fixture paths
+      # built at run time.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+      # pkg/embed wraps the ONNX Runtime C API. Its unchecked errors are all
+      # unactionable cleanup calls (ORT *.Destroy(), temp-file Close/Remove on
+      # the download path); packages authored to our own standard are
+      # unaffected.
+      - path: pkg/embed/
+        linters:
+          - errcheck
+      # defer close/remove patterns don't need error checks
+      - text: "defer .+\\.Close\\(\\)"
+        linters:
+          - errcheck
+      - text: "defer os\\.RemoveAll\\("
+        linters:
+          - errcheck
+      # modernize newexpr is too noisy
+      - text: "newexpr"
+        linters:
+          - modernize
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+
+  settings:
+    gofumpt:
+      extra-rules: true
+    goimports:
+      local-prefixes:
+        - github.com/reactor-team

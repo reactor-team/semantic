@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a change or an addition
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Open this before writing a large change. A design disagreement is cheap
+        to settle here and expensive to settle in a 900-line pull request.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What are you trying to do that the tool makes hard today? Describe the
+        situation, not the solution — the fix may not be the one you have in
+        mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What else you considered
+      description: Including doing nothing, or solving it outside this tool.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Would you implement it?
+      options:
+        - label: I am willing to open a pull request for this

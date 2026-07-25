@@ -1,0 +1,14 @@
+# Build output (mise run build)
+/bin/
+/dist/
+
+# The index semantic builds for this repo when it is run on itself. It is a
+# derived artifact keyed to local file paths, so it is never worth committing.
+.semantic/
+
+# Coverage output
+*.out
+coverage.*
+
+# macOS Finder metadata
+.DS_Store

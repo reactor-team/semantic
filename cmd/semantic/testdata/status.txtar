@@ -1,0 +1,30 @@
+# `semantic status` answers "why is this not working" before anything else is
+# tried. It reports the two things that can be missing independently — the
+# model and the index — and never fails, because a diagnostic that exits
+# non-zero is one more thing to debug.
+
+env SEMANTIC_CACHE_DIR=$WORK/cache
+
+# Nothing installed and nothing indexed. Both lines name the command that
+# fixes them, since this is the output a first-time user sees.
+semantic status
+! stderr .
+stdout '^model:   not ready'
+stdout 'run: semantic init'
+stdout 'not created yet — run: semantic index'
+
+# The model is missing but the index is not: the two are reported separately
+# because lint and graph work on an index built with --no-embed, and a user
+# with that setup should not be told their index is broken.
+semantic lint --no-embed
+
+semantic status
+stdout '^model:   not ready'
+stdout '^files:   1$'
+stdout '^chunks:  [0-9]+$'
+stdout '^indexed: [0-9]{4}-[0-9]{2}-[0-9]{2}T'
+
+-- README.md --
+# Project
+
+One short file, so the counts are predictable.

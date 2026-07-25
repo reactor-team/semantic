@@ -1,0 +1,34 @@
+# Copyright (c) 2026 Reactor Technologies, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# semantic is a standalone repo (its own go.mod under the reactor-team org), not
+# part of the reactor monorepo — so this is a plain single-module mise config,
+# not monorepo mode. It mirrors the reactor tooling-module conventions:
+# file-based tasks in mise-tasks/*.sh (discoverable via `mise tasks`,
+# shellcheck-lintable), tools pinned here, Go version read from /.go-version.
+#
+# No [env] version block: the release is derived (calendar version
+# v1.<UTC-date>.0-g<short-sha>) and computed in-task. Override with a RELEASE
+# env var.
+#
+# CGO is REQUIRED: onnxruntime_go's non-Windows path links -ldl via cgo to
+# dlopen the ONNX runtime at first use. Building therefore needs a C compiler
+# (Xcode command line tools on macOS, build-essential on Debian). See CONTRIBUTING.md
+# and the build/install/test tasks.
+
+[tools]
+# golangci-lint + gotestsum pinned to the reactor ecosystem versions so local
+# lint/test behaves the same here as in the monorepo.
+golangci-lint = "2.11.4"
+gotestsum = "1.13.0"
+# The build tasks are shell and the release path is GitHub Actions, so both are
+# linted alongside the Go. actionlint knows which runner labels GitHub still
+# offers, which no YAML schema check can tell you.
+shellcheck = "0.11.0"
+actionlint = "1.7.12"
+# Go toolchain is intentionally NOT declared here. The canonical version lives
+# in /.go-version and mise reads it via idiomatic_version_file below — same
+# single-source pattern as the reactor monorepo.
+
+[settings]
+idiomatic_version_file_enable_tools = ["go"]

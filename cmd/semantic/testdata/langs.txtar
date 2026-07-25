@@ -1,0 +1,29 @@
+# `semantic langs` is the discovery half of --lang. The flag rejects a name it
+# does not know, so something has to say what the known names are, and this is
+# it. The names printed here are exactly the strings --lang accepts.
+#
+# The list is checked for the languages that must be there, not for its whole
+# contents: adding a grammar adds a line, and that must not fail the suite.
+
+env SEMANTIC_CACHE_DIR=$WORK/cache
+
+semantic langs
+! stderr .
+stdout '^go$'
+stdout '^markdown$'
+stdout '^python$'
+stdout '^typescript$'
+stdout '^yaml$'
+
+# Canonical names only. `c++`, `k8s`, and `terraform` are accepted as aliases
+# but are not the names printed, because a filter value that round-trips
+# through this list has to be the one the index stores.
+stdout '^cpp$'
+! stdout '\+\+'
+stdout '^hcl$'
+! stdout '^terraform$'
+
+# One name per line and nothing else, so the output pipes into a shell loop or
+# a completion script without parsing.
+! stdout ' '
+! stdout ','

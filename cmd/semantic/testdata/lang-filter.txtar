@@ -1,0 +1,36 @@
+# An unknown --lang value is an error, never a filter that matches nothing.
+#
+# This is the whole reason the flag validates at all. A search that quietly
+# returns zero hits reads as "there is no such code in this repository", which
+# is a far worse answer than "there is no such language" — and the user has no
+# way to tell the two apart. So a typo has to fail loudly, and it has to fail
+# before the query is embedded, or the message would be about a missing model.
+
+env SEMANTIC_CACHE_DIR=$WORK/cache
+
+! semantic search --lang cobol 'anything'
+! stdout .
+stderr 'unknown language "cobol"'
+# The message points at the command that lists the valid names.
+stderr 'semantic langs'
+# It failed on the flag, not on the model: validation runs before the index is
+# opened and before anything is embedded.
+! stderr 'semantic init'
+
+# A comma-separated list is validated name by name, so one bad entry in an
+# otherwise good list is still caught and named.
+! semantic search --lang go,cobol 'anything'
+stderr 'unknown language "cobol"'
+
+# An alias resolves and gets through validation. The failure that follows is
+# the missing model, which is how this asserts the language itself was
+# accepted — there is no other observable difference without an index.
+! semantic search --lang c++ 'anything'
+stderr 'semantic init'
+! stderr 'unknown language'
+
+# Repeating the flag is the other spelling people reach for, and it takes the
+# same path.
+! semantic search --lang go --lang python 'anything'
+stderr 'semantic init'
+! stderr 'unknown language'

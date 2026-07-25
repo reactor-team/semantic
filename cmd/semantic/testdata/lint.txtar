@@ -1,0 +1,65 @@
+# The lint round trip, end to end: index a vault, flag a finding, fix it, and
+# come back clean.
+#
+# This is the one script that drives the whole pipeline — SQLite index, chunker,
+# link extractor, lint analysis, and the in-place rewriter — because
+# `--no-embed` is the path that reaches all of it without the ONNX model. It is
+# also the shape a pre-commit hook uses.
+
+env SEMANTIC_CACHE_DIR=$WORK/cache
+
+# A finding is an error exit, not just a printed list. A hook that runs lint
+# has to be able to fail the commit on the status code alone.
+! semantic lint --no-embed
+stderr 'reindexed 2 changed file\(s\)'
+stdout 'unlinked references \(1\)'
+stdout 'README\.md:3\tdocs/guide\.md → docs/guide\.md'
+stderr '1 lint issue\(s\) flagged'
+
+# The inline-code path is the finding, and the real markdown link on the line
+# below it is not — a link already registers as a graph edge, which is the
+# whole point of converting the other one.
+stdout 'unlinked references \(1\)'
+
+# Every section says whether a human is needed. This one is auto-fixable and
+# names the command that does it.
+stdout 'fix \(auto\): run `semantic lint --fix`'
+
+semantic lint --no-embed --fix
+stdout 'linked 1 unlinked reference\(s\) across 1 file\(s\)'
+# The rewrite keeps the original path as the visible label and makes the target
+# root-absolute, so the rendered page reads the same as before.
+stdout 'README\.md\tdocs/guide\.md → \[`docs/guide\.md`\]\(/docs/guide\.md\)'
+cmp README.md README.fixed
+
+# Only the flagged reference moved. The fixer edits the span it found and
+# leaves the rest of the file alone, including the link it deliberately did
+# not flag.
+semantic lint --no-embed
+stdout 'no lint issues flagged'
+! stdout 'unlinked'
+
+# Fixing changed a file, so the next run re-indexes exactly that one.
+stderr 'reindexed 1 changed file\(s\)'
+
+# Running the fixer with nothing to fix is a no-op that still succeeds, which
+# is what makes it safe to wire into a hook unconditionally.
+semantic lint --no-embed --fix
+! stdout 'linked 1'
+
+-- README.md --
+# Project
+
+The guide lives in `docs/guide.md` and explains the rest.
+
+See [the guide](docs/guide.md) for details.
+-- docs/guide.md --
+# Guide
+
+Back to [the readme](../README.md).
+-- README.fixed --
+# Project
+
+The guide lives in [`docs/guide.md`](/docs/guide.md) and explains the rest.
+
+See [the guide](docs/guide.md) for details.

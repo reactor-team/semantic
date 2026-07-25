@@ -1,0 +1,151 @@
+# Copyright (c) 2026 Reactor Technologies, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Release binaries are built on a native runner per platform, not cross-compiled
+# from one. onnxruntime_go links -ldl through cgo, so a build needs a working C
+# toolchain for the target. Cross-compiling to macOS would need the macOS SDK,
+# which Apple does not allow redistributing — which is also why goreleaser's
+# single-runner model does not fit this repository.
+#
+# `go install` remains the primary install path. These archives are a
+# convenience for anyone without a Go toolchain. Neither the embedding model nor
+# the ONNX runtime is bundled: `semantic init` fetches them on first use.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and release
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CGO_ENABLED: "1"
+
+jobs:
+  build:
+    name: build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - runner: macos-15-intel
+            goos: darwin
+            goarch: amd64
+          - runner: macos-latest
+            goos: darwin
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          # The build stamps the commit sha, so the checkout needs real history
+          # rather than a synthetic shallow commit.
+          fetch-depth: 0
+
+      - uses: jdx/mise-action@v4
+        with:
+          experimental: true
+
+      - name: Build
+        env:
+          # The tag is the version. Without this the task derives a calendar
+          # version, which would not match the release it ships under.
+          RELEASE: ${{ inputs.tag || github.ref_name }}
+        run: mise run build
+
+      - name: Archive
+        id: archive
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          bin="bin/semantic_${{ matrix.goos }}-${{ matrix.goarch }}"
+          test -x "$bin"
+          # Verify the stamp before shipping: a binary reporting the wrong
+          # version is worse than a failed release.
+          "$bin" --version
+          staging="$(mktemp -d)"
+          cp "$bin" "$staging/semantic"
+          cp LICENSE NOTICE README.md CHANGELOG.md "$staging/"
+          name="semantic_${TAG}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          # Members named explicitly rather than `.`, so the archive has a
+          # stable order and no `./` prefix on every entry.
+          tar -czf "${name}.tar.gz" -C "$staging" \
+            semantic LICENSE NOTICE README.md CHANGELOG.md
+          shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.archive.outputs.name }}
+          path: |
+            ${{ steps.archive.outputs.name }}.tar.gz
+            ${{ steps.archive.outputs.name }}.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # Provenance lets a consumer verify an archive was built by this workflow
+      # from this commit, rather than uploaded by hand.
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Collect checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          cat ./*.sha256 > checksums.txt
+          rm -f ./*.sha256
+          echo "--- release contents"
+          ls -1
+          cat checksums.txt
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.tar.gz
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          # --verify-tag refuses to invent a tag that does not exist, so a typo
+          # in the manual-dispatch input fails here rather than publishing.
+          gh release create "$TAG" \
+            --verify-tag \
+            --title "$TAG" \
+            --notes "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${TAG}/CHANGELOG.md)." \
+            dist/*

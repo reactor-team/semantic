@@ -19,6 +19,8 @@ notes.
 - Quickstart
 - What it can do
   - Corpus hygiene, in a bit more detail
+    - What `lint` flags
+    - Fixing and suppressing
 - Configuration
 - Development
 - Contributing
@@ -154,41 +156,57 @@ semantic <command> --help
   (the file resolves but the `#section` matches no heading) — so linking straight
   to a section is safe and validated. `--backlinks PATH` shows what points at a
   file; `--json`/`--dot` feed other tooling.
-- **`lint`** catches three link smells and one structure smell. First, doc or
-  source-code references written as inline code (`` `docs/x.md` ``,
-  `` `pkg/file.go` ``), which never become graph edges (so a file referenced
-  only that way reads as an orphan): split into **unlinked** (resolve to
-  exactly one file — worth turning into a link), **ambiguous** (a bare
-  basename with no directory, like `` `service.go` ``, matches more than one
-  indexed file of that name — promoting it would silently pick whichever
-  sorts first, so it's reported with its full candidate list instead), and
-  **broken** (dead path or dead `#section`). Second, **deep relative links** —
-  real `[text](path)` links that climb two or more directories with `../../`;
-  it suggests the equivalent root-absolute path (`/docs/x.md`), which survives <!-- semantic-ignore: illustrative example path -->
-  moving the source file. The suggestion is anchored at the enclosing git
-  repository root the way GitHub resolves a leading-`/` link, so a vault
-  indexed below the repo root (a monorepo or `docs/` sub-tree) gets the right
-  prefix (`/subproj/docs/x.md`); with no repo it stays vault-relative. Third, <!-- semantic-ignore: illustrative example path -->
-  **missing Contents TOCs** — markdown files over 100 lines whose committed
-  `## Contents` table is absent or out of date, so a partial read of a long
-  file still reveals its full scope. `--fix` rewrites the auto-fixable
-  findings in place: unlinked inline-code refs become real links
-  (`` `pkg/file.go` `` → `` [`pkg/file.go`](/pkg/file.go) ``, the original path
-  as label, root-absolute so it resolves from wherever it's written), deep
-  links to their root-absolute form, and
-  Contents TOCs regenerated from the heading tree (a plain-text outline
-  directly under the `## Contents` heading); ambiguous and broken refs still
-  need a human. False positives suppress ESLint-style with
-  `<!-- semantic-ignore -->` on the offending line, `-next-line` on the line
-  above, or `-file` at the top to exempt a whole file — the shape a vendored or
-  verbatim third-party document wants, since it silences the TOC check too.
-  `--unlinked`/`--ambiguous`/`--broken`/`--deep`/
-  `--toc` narrow both the report and `--fix` to just the selected kinds
-  (`--unlinked --fix` promotes unlinked refs only, touching neither deep links
-  nor TOCs). Passing file paths
-  (`semantic lint --toc --fix <files…>`) scopes every check and fix to just
-  those files — the shape a pre-commit hook wants so it touches only staged
-  files, not the whole vault.
+- **`lint`** flags what the graph cannot see — references that should be links,
+  links that will break when a file moves, and long files with no Contents
+  table. It carries the most surface of the three, so it gets its own breakdown
+  below.
+
+#### What `lint` flags
+
+Five findings: four about links, one about structure. Each flag names one, and
+selects it in both the report and `--fix`.
+
+| Flag | Finding | Under `--fix` |
+|---|---|---|
+| `--unlinked` | A doc or source path written as inline code that resolves to exactly one file. | Becomes a link |
+| `--ambiguous` | A bare basename with no directory (`` `service.go` ``) matching more than one indexed file. | Needs a human |
+| `--broken` | A dead path, or a dead `#section` anchor. | Needs a human |
+| `--deep` | A real `[text](path)` link climbing two or more directories with `../../`. | Rewritten root-absolute |
+| `--toc` | A markdown file over 100 lines whose `## Contents` table is absent or out of date. | Regenerated |
+
+The first three are inline-code references, and they group together because
+such a reference never becomes a graph edge — a file referenced only that way
+reads as an orphan. An ambiguous one is reported with its full candidate list
+rather than fixed, because promoting it would silently pick whichever candidate
+sorts first.
+
+A deep link's replacement is root-absolute (`/docs/x.md`), which survives moving <!-- semantic-ignore: illustrative example path -->
+the source file. The suggestion is anchored at the enclosing git repository root,
+the way GitHub resolves a leading-`/` link, so a vault indexed below that root —
+a monorepo, or a `docs/` sub-tree — gets the right prefix
+(`/subproj/docs/x.md`). With no repository it stays vault-relative. <!-- semantic-ignore: illustrative example path -->
+
+A Contents table earns its keep on a long file because a partial read then still
+reveals the file's full scope.
+
+#### Fixing and suppressing
+
+`--fix` rewrites the auto-fixable findings in place. An unlinked reference
+becomes a real link carrying the original path as its label
+(`` `pkg/file.go` `` → `` [`pkg/file.go`](/pkg/file.go) ``), root-absolute so it
+resolves from wherever it is written. Contents tables are regenerated from the
+heading tree, as a plain-text outline directly under the `## Contents` heading.
+
+Narrowing composes with fixing: `--unlinked --fix` promotes unlinked references
+only, touching neither deep links nor TOCs. Passing file paths scopes every
+check and every fix to those files — `semantic lint --toc --fix <files…>` is the
+shape a pre-commit hook wants, so it reaches staged files rather than the whole
+vault.
+
+False positives suppress ESLint-style: `<!-- semantic-ignore -->` on the
+offending line, `-next-line` on the line above, or `-file` at the top to exempt
+a whole file. The last is what a vendored or verbatim third-party document
+wants, since it silences the TOC check too.
 
 ## Configuration
 

@@ -27,6 +27,7 @@ require (
 	github.com/yalue/onnxruntime_go v1.31.0
 	github.com/yuin/goldmark v1.8.4
 	go.yaml.in/yaml/v3 v3.0.4
+	golang.org/x/term v0.45.0
 	modernc.org/sqlite v1.54.0
 )
 
@@ -43,7 +44,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/schollz/progressbar/v2 v2.15.0 // indirect
 	github.com/sugarme/regexpset v0.0.0-20200920021344-4d4ec8eaf93c // indirect
-	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.39.0 // indirect
 	golang.org/x/tools v0.47.0 // indirect
 	modernc.org/libc v1.74.1 // indirect

@@ -134,6 +134,22 @@ func (s *Store) RebuildReason(canEmbed bool) (string, error) {
 	return st.reason(), nil
 }
 
+// EmbedStamp returns the representation the index's stored vectors were built
+// with, or "" when nothing has ever embedded into it.
+//
+// Reindex compares this itself and heals a mismatch. It is exported for the
+// one caller that cannot rely on that: --no-reindex skips the healing, and
+// ranking a query vector against vectors from another model returns confident
+// nonsense rather than an error. A caller about to do that needs to be able to
+// ask first.
+func (s *Store) EmbedStamp() (string, error) {
+	stored, err := s.allMeta()
+	if err != nil {
+		return "", err
+	}
+	return stored[metaEmbedID], nil
+}
+
 // stampRepresentation records this binary's stamps as the state of the index.
 // Call it only after a run that actually brought the index up to them.
 //

@@ -16,6 +16,58 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+A better default embedding model, a registry so it is no longer the only one,
+and progress output for the commands that used to sit silent.
+
+### Changed
+
+- **[reindex]** **The default embedding model is now `arctic-embed-xs`,
+  replacing `all-MiniLM-L6-v2`.** Measured against a held-out set of real
+  retrieval queries representative of how `semantic` is actually used, it
+  ranks results better at roughly two-thirds the download of the other
+  candidate default, `bge-small-en-v1.5`. Vectors from the two models are not
+  comparable, so the first command that ranks re-embeds the vault and says so
+  first. Two details of this checkpoint are load-bearing and both fail
+  silently when wrong: it pools at `[CLS]` rather than averaging tokens, and a
+  query — never a stored passage — is prefixed with `Represent this sentence
+  for searching relevant passages:`. Both are pinned by tests.
+- **`graph` and `lint` no longer embed.** Neither command reads a chunk's
+  vector, but both used to run the embedder during their automatic reindex,
+  which made the first `lint` after a model change re-embed the entire vault to
+  produce a result it could not use. They now index with a placeholder vector
+  and leave the model stamp alone; the next `search`, `dupes`, or `semantic
+  index` fills in exactly those chunks. `lint --no-embed` became a no-op and is
+  still accepted, so existing hooks and CI keep working.
+
+### Added
+
+- **`--model` / `$SEMANTIC_MODEL`, and `semantic models` to list them.** The
+  registry ships `arctic-embed-xs` (the default), `bge-small-en-v1.5`,
+  `bge-small-en-v1.5-int8`, and `all-MiniLM-L6-v2` (kept as the pre-0.1.3
+  baseline). Each model caches under its own directory, so switching back
+  after the first download costs nothing, and each carries its own dimension,
+  sequence length, pooling strategy, and query prefix — the parts that differ
+  between checkpoints and quietly produce bad rankings when assumed.
+- **`bge-small-en-v1.5-int8`**, the bge checkpoint at a quarter the download
+  (33 MB against 127 MB) with no measurable accuracy cost. It is not the
+  default because it indexes about 17% slower on Apple Silicon, where ONNX
+  Runtime spends more converting around each matmul than int8 arithmetic
+  saves. Worth selecting when the download or the disk costs more than
+  indexing time does.
+- **A guard against ranking across two models.** `--no-reindex` skips the
+  rebuild that heals a model change, which previously left a query from one
+  model scored against vectors from another: a confident number, and meaningless.
+  `search` and `dupes` now compare the index's stamp against the running model
+  and refuse with a message naming both.
+- **Progress output while downloading and indexing.** A model fetch and a
+  full reindex both used to print nothing until they finished, which is
+  indistinguishable from a hang. Both now report on a single rewritten line of
+  stderr, drawn only to a terminal so redirected output and the end-to-end
+  scripts are unaffected.
+- **`$SEMANTIC_NO_DOWNLOAD`** makes a missing model an error instead of a
+  fetch — for CI, and for anyone who would rather not have a command silently
+  pull a checkpoint.
+
 ## [0.1.2] — 2026-07-25
 
 Four corrections to what semantic says, three of them user-facing. Nothing

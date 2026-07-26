@@ -12,19 +12,11 @@ import (
 	ort "github.com/yalue/onnxruntime_go"
 )
 
-const (
-	modelDim = 384
-
-	// maxSeqLen caps tokens per embed. all-MiniLM-L6-v2 was trained at
-	// 256. Markdown sections run long, so we keep the model's full window.
-	// Chunks past this are truncated (the chunker aims to stay under it).
-	maxSeqLen = 256
-)
-
 type localInferencer struct {
 	session    *ort.DynamicAdvancedSession
 	tok        *tokenizer.Tokenizer
-	useTypeIDs bool // whether the model accepts token_type_ids
+	useTypeIDs bool   // whether the model accepts token_type_ids
+	model      *Model // the checkpoint this session was built from
 }
 
 var (
@@ -36,6 +28,11 @@ var (
 	initMu     sync.Mutex
 	inferencer *localInferencer
 
+	// ortReady records that the ORT environment is up. Initializing it is a
+	// process-global, once-only act, so it cannot live with the session, which
+	// is torn down and rebuilt whenever the selected model changes.
+	ortReady bool
+
 	// runMu serializes embed() calls: ORT sessions aren't safe for
 	// concurrent Run(), and the CLI embeds serially, so one shared session
 	// behind a mutex is sufficient (and far simpler than a session pool).
@@ -44,19 +41,33 @@ var (
 
 // getInferencer lazily builds the shared session, initializing the ORT
 // runtime on first use. Safe to call repeatedly; retries after a failed init.
+//
+// A session built for a different checkpoint than the one now selected is
+// discarded rather than reused. Select already tears one down, so this is the
+// backstop for a caller that changed the selection some other way — embedding
+// with the wrong weights would produce vectors nothing downstream could tell
+// apart from the right ones.
 func getInferencer() (*localInferencer, error) {
 	initMu.Lock()
 	defer initMu.Unlock()
+	m := Current()
 	if inferencer != nil {
-		return inferencer, nil
+		if inferencer.model == m {
+			return inferencer, nil
+		}
+		inferencer.close()
+		inferencer = nil
 	}
 	if err := Check(); err != nil {
 		return nil, err
 	}
 
-	ort.SetSharedLibraryPath(findOrtLib())
-	if err := ort.InitializeEnvironment(); err != nil {
-		return nil, fmt.Errorf("ONNX Runtime init: %w", err)
+	if !ortReady {
+		ort.SetSharedLibraryPath(findOrtLib())
+		if err := ort.InitializeEnvironment(); err != nil {
+			return nil, fmt.Errorf("ONNX Runtime init: %w", err)
+		}
+		ortReady = true
 	}
 
 	modelDir := ModelCacheDir()
@@ -64,8 +75,30 @@ func getInferencer() (*localInferencer, error) {
 	if err != nil {
 		return nil, err
 	}
+	inf.model = m
 	inferencer = inf
 	return inferencer, nil
+}
+
+// resetInferencer drops the live session so the next embed builds one against
+// whatever checkpoint is now selected. The ORT environment stays up: it is
+// process-global and not tied to any one model.
+func resetInferencer() {
+	initMu.Lock()
+	defer initMu.Unlock()
+	if inferencer != nil {
+		inferencer.close()
+		inferencer = nil
+	}
+}
+
+// close releases the ORT session. Called when the selection changes, which in
+// a long-lived process would otherwise leak one native session per switch.
+func (l *localInferencer) close() {
+	if l.session != nil {
+		l.session.Destroy()
+		l.session = nil
+	}
 }
 
 // newInferencer builds the ORT session + tokenizer pair.
@@ -92,22 +125,40 @@ func newInferencer(modelPath, tokPath string) (*localInferencer, error) {
 		return nil, fmt.Errorf("SetInterOpNumThreads: %w", err)
 	}
 
-	// Try with three inputs first; some exported models omit token_type_ids.
-	outputNames := []string{"last_hidden_state"}
-	sess, err := ort.NewDynamicAdvancedSessionWithONNXData(
-		modelBytes,
-		[]string{"input_ids", "attention_mask", "token_type_ids"},
-		outputNames, opts,
-	)
-	useTypeIDs := true
+	// Ask the graph itself which inputs and outputs it declares. A dynamic
+	// session accepts any name list at construction and only fails at Run(),
+	// so probing by attempting construction and catching the error (the prior
+	// approach for token_type_ids) misses models that build fine but reject
+	// the tensor on the first embed — found on mxbai-embed-xsmall-v1, whose
+	// graph has neither a token_type_ids input nor a last_hidden_state output.
+	inputs, outputs, err := ort.GetInputOutputInfoWithONNXData(modelBytes)
 	if err != nil {
-		sess, err = ort.NewDynamicAdvancedSessionWithONNXData(
-			modelBytes,
-			[]string{"input_ids", "attention_mask"},
-			outputNames, opts,
-		)
-		useTypeIDs = false
+		return nil, fmt.Errorf("reading model inputs: %w", err)
 	}
+	useTypeIDs := false
+	names := []string{"input_ids", "attention_mask"}
+	for _, in := range inputs {
+		if in.Name == "token_type_ids" {
+			useTypeIDs = true
+			names = append(names, "token_type_ids")
+			break
+		}
+	}
+
+	// The per-token hidden state is exported under one of two names depending
+	// on the tool that produced the ONNX file. Either shape is [1, seqLen,
+	// Dim] and pool() treats them identically — the pooling choice comes from
+	// Model.Pooling, not from whichever the export also happened to bake in,
+	// so a checkpoint scores the same regardless of which name it used.
+	hiddenName := "last_hidden_state"
+	for _, out := range outputs {
+		if out.Name == "token_embeddings" {
+			hiddenName = "token_embeddings"
+			break
+		}
+	}
+
+	sess, err := ort.NewDynamicAdvancedSessionWithONNXData(modelBytes, names, []string{hiddenName}, opts)
 	if err != nil {
 		return nil, fmt.Errorf("creating ONNX session: %w", err)
 	}
@@ -130,10 +181,10 @@ func (l *localInferencer) embed(text string) (Vec, error) {
 	rawMask := enc.GetAttentionMask()
 	rawTypeIDs := enc.GetTypeIds()
 
-	// Truncate to maxSeqLen.
+	// Truncate to the checkpoint's window.
 	seqLen := len(rawIDs)
-	if seqLen > maxSeqLen {
-		seqLen = maxSeqLen
+	if seqLen > l.model.MaxSeqLen {
+		seqLen = l.model.MaxSeqLen
 		rawIDs = rawIDs[:seqLen]
 		rawMask = rawMask[:seqLen]
 		rawTypeIDs = rawTypeIDs[:seqLen]
@@ -185,43 +236,79 @@ func (l *localInferencer) embed(text string) (Vec, error) {
 		outputs[0].Destroy()
 		return nil, fmt.Errorf("unexpected output type from ONNX model")
 	}
-	// last_hidden_state: [1, seqLen, modelDim] — flat []float32 of length seqLen*modelDim
+	// the per-token hidden state: [1, seqLen, Dim] — flat []float32 of length seqLen*Dim
 	hidden := hiddenTensor.GetData()
-	result := meanPool(hidden, mask, seqLen, modelDim)
+	result := pool(l.model.Pooling, hidden, mask, seqLen, l.model.Dim)
 	hiddenTensor.Destroy()
 
 	normalizeVec(result)
 	return Vec(result), nil
 }
 
-// meanPool averages token embeddings weighted by the attention mask.
+// pool reduces the per-token hidden states to one vector the way the
+// checkpoint was trained to be reduced. The two modes are not interchangeable:
+// applying the wrong one yields a coherent-looking vector that ranks badly,
+// with nothing downstream able to tell, which is why the mode is a field on
+// Model and part of RepresentationID rather than a global choice.
 //
-// seqLen is clamped to what the two slices actually hold. embed builds both
-// from the same length, so the clamp never fires there; it exists because
-// hidden comes back across the ONNX boundary, and a model whose output shape
-// differs from the one assumed here should degrade rather than panic in the
-// middle of indexing a repository.
+// An unrecognized mode falls back to CLS instead of failing. Pooling sits in
+// the middle of indexing a repository, and Model values come from a registry
+// this package controls, so the unreachable case degrades rather than aborts.
+func pool(mode Pooling, hidden []float32, mask []int64, seqLen, dim int) []float32 {
+	if mode == PoolMean {
+		return meanPool(hidden, mask, seqLen, dim)
+	}
+	return clsPool(hidden, dim)
+}
+
+// clsPool takes the first token's hidden state as the sentence embedding. The
+// [CLS] position is where a BGE-style training objective puts the sentence
+// representation.
+//
+// A short output is padded rather than treated as an error. hidden crosses the
+// ONNX boundary, and a model whose output shape differs from the one assumed
+// here should degrade rather than panic in the middle of indexing a repository.
+func clsPool(hidden []float32, dim int) []float32 {
+	out := make([]float32, dim)
+	if dim <= 0 {
+		return out
+	}
+	copy(out, hidden[:min(dim, len(hidden))])
+	return out
+}
+
+// meanPool averages over the real tokens only, which is what the
+// sentence-transformers MiniLM checkpoints are trained with. The padding a
+// batch adds carries no meaning, and letting it into the average would pull
+// every short chunk's vector toward the same point.
+//
+// Short inputs are handled the same way clsPool handles them: whatever is
+// actually present is averaged, and a fully masked input returns zeros rather
+// than dividing by zero and poisoning every later cosine comparison with NaN.
 func meanPool(hidden []float32, mask []int64, seqLen, dim int) []float32 {
 	out := make([]float32, dim)
 	if dim <= 0 {
 		return out
 	}
-	seqLen = max(0, min(seqLen, len(mask), len(hidden)/dim))
-
-	var count float32
-	for i, m := range mask[:seqLen] {
-		if m == 0 {
+	var count int
+	for t := 0; t < seqLen && t < len(mask); t++ {
+		if mask[t] == 0 {
 			continue
 		}
+		base := t * dim
+		if base+dim > len(hidden) {
+			break
+		}
+		for d := range dim {
+			out[d] += hidden[base+d]
+		}
 		count++
-		for j, h := range hidden[i*dim : i*dim+dim] {
-			out[j] += h
-		}
 	}
-	if count > 0 {
-		for j := range out {
-			out[j] /= count
-		}
+	if count == 0 {
+		return out
+	}
+	for d := range out {
+		out[d] /= float32(count)
 	}
 	return out
 }

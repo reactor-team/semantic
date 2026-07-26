@@ -38,6 +38,7 @@ type Globals struct {
 	DB        string `help:"Index database path (default: <vault>/.semantic/index.db)." env:"SEMANTIC_DB" placeholder:"PATH"`
 	Vault     string `help:"Vault root to resolve relative paths against (default: cwd)." placeholder:"DIR"`
 	NoReindex bool   `name:"no-reindex" help:"Skip the auto-reindex search/dupes/graph/lint normally run first; answer from the index as last built."`
+	Model     string `help:"Embedding model to embed with; see 'semantic models'." env:"SEMANTIC_MODEL" placeholder:"NAME"`
 }
 
 // resolvedVault is the vault root every command resolves against: --vault when
@@ -75,11 +76,15 @@ func printJSON(v any) error {
 // alongside the store, since callers building the link graph or resolving
 // linkRoot need it too.
 //
-// skipEmbed drops the embedder from the reindex pass — graph and lint never
-// read a chunk's vector, so a caller that only needs those checks can skip
-// the ONNX inference cost entirely. Chunks embedded this way are stored with
-// a placeholder vector; a later reindex with a real embedder (search, dupes,
-// or plain `semantic index`) detects and re-embeds them for real.
+// skipEmbed drops the embedder from the reindex pass. graph and lint never
+// read a chunk's vector, so they always pass it, and the saving is larger
+// than the inference they skip: a representation change is only reported when
+// an embedder is present, so embedding here would also drag the whole vault
+// back through the model on the first lint after a model swap — minutes of
+// work for a command that cannot use the result. Chunks indexed this way get
+// a placeholder vector and the model stamp is left alone; the next run that
+// does embed (search, dupes, or plain `semantic index`) re-embeds exactly
+// those chunks.
 func (g *Globals) openForRead(skipEmbed bool) (*index.Store, string, error) {
 	vault := g.resolvedVault()
 	st, err := index.Open(g.dbPath())
@@ -89,39 +94,107 @@ func (g *Globals) openForRead(skipEmbed bool) (*index.Store, string, error) {
 	if g.NoReindex {
 		return st, vault, nil
 	}
-	var embedFn index.Embedder = embed.Get
-	if skipEmbed {
-		embedFn = nil
+	var embedFn index.Embedder
+	if !skipEmbed {
+		// The reindex below is about to embed, so fetch the model if it is
+		// missing. Under --no-reindex nothing here embeds and the command is
+		// left alone; search asks separately, because its query needs the
+		// model whether or not the index was refreshed.
+		if err := ensureEmbedReady(); err != nil {
+			_ = st.Close()
+			return nil, "", err
+		}
+		embedFn = embed.Get
 	}
 	// Warn before the work, not after. A representation change makes this
 	// implicit reindex rebuild the whole vault, which on a large tree is minutes
 	// of silence on a command the user expected to answer immediately.
 	if why, err := st.RebuildReason(embedFn != nil); err == nil && why != "" {
-		fmt.Fprintf(os.Stderr, "semantic: %s — rebuilding the index (one time)\n", why)
+		stderrf("semantic: %s — rebuilding the index (one time)", why)
 	}
+	stop := withIndexProgress(st)
 	rep, err := st.Reindex(vault, embedFn, false)
+	stop()
 	if err != nil {
 		_ = st.Close()
 		return nil, "", fmt.Errorf("auto-reindex: %w", err)
 	}
 	if rep.Relinked > 0 {
-		fmt.Fprintf(os.Stderr, "semantic: re-extracted links for %d file(s)\n", rep.Relinked)
+		stderrf("semantic: re-extracted links for %d file(s)", rep.Relinked)
 	}
 	if rep.Added+rep.Updated+rep.Deleted > 0 {
-		fmt.Fprintf(os.Stderr, "semantic: reindexed %d changed file(s) (+%d ~%d -%d)\n",
+		stderrf("semantic: reindexed %d changed file(s) (+%d ~%d -%d)",
 			rep.Added+rep.Updated+rep.Deleted, rep.Added, rep.Updated, rep.Deleted)
 	}
 	return st, vault, nil
 }
 
+// status is the one live progress line for the process. It is package-level
+// because two things write it — the download hook and the index hook — and a
+// second instance would erase a line it did not draw, leaving the first one's
+// text stranded on screen.
+var status *statusLine
+
+// stderrf prints a milestone, erasing the live progress line first. Every
+// write to stderr that is not the progress line itself has to go through here,
+// or it lands on top of a line that is still there.
+func stderrf(format string, a ...any) {
+	status.done()
+	fmt.Fprintf(os.Stderr, format+"\n", a...)
+}
+
+// withIndexProgress makes the store report each file it reaches, so a rebuild
+// on a large tree shows movement instead of sitting silent. The line is erased
+// before the caller prints anything of its own.
+func withIndexProgress(st *index.Store) func() {
+	st.SetProgress(func(rel string, done int) {
+		status.set(fmt.Sprintf("  indexing %d: %s", done, rel), false)
+	})
+	return func() {
+		st.SetProgress(nil)
+		status.done()
+	}
+}
+
+// assertVectorsComparable refuses to rank against vectors from a different
+// model than the one now selected. Only --no-reindex reaches it: every other
+// path re-embeds the index on a mismatch, which is the fix rather than the
+// error.
+//
+// This is a hard failure and not a warning because the alternative is worse
+// than a stale answer. Cosine similarity between two models' vectors is a real
+// number in the right range, ordered by nothing — the command prints ranked
+// results, at plausible-looking scores, that mean nothing at all. An empty
+// index and an index that has only ever been linted are both left alone; they
+// have no vectors to be wrong about, and search already returns nothing.
+func assertVectorsComparable(st *index.Store) error {
+	stored, err := st.EmbedStamp()
+	if err != nil || stored == "" {
+		return err
+	}
+	if stored == embed.RepresentationID() {
+		return nil
+	}
+	return fmt.Errorf(
+		"index was built with %s but this run embeds with %s — scores between the two are meaningless.\n"+
+			"       Drop --no-reindex to rebuild the index, or pass --model to match what built it",
+		stored, embed.RepresentationID())
+}
+
+// ensureEmbedReady fetches the runtime and model when they are missing, so a
+// command that embeds does not stop to tell the user to run `init` first. It is
+// a no-op once they are cached. `semantic init` remains the way to pay the
+// download deliberately rather than in the middle of a query.
+func ensureEmbedReady() error {
+	return embed.EnsureModel(stderrf)
+}
+
 // InitCmd downloads the ONNX runtime library + embedding model into the OS
-// cache dir. One-time, idempotent, ~120MB.
+// cache dir. One-time, idempotent, ~160MB.
 type InitCmd struct{}
 
 func (c *InitCmd) Run(_ *Globals) error {
-	return embed.DownloadAll(func(format string, a ...any) {
-		fmt.Fprintf(os.Stderr, format+"\n", a...)
-	})
+	return embed.DownloadAll(stderrf)
 }
 
 // IndexCmd incrementally (re)builds the index for the vault (--vault, default
@@ -146,10 +219,15 @@ func (c *IndexCmd) Run(g *Globals) error {
 	}
 	defer func() { _ = st.Close() }()
 
-	if why, err := st.RebuildReason(true); err == nil && why != "" {
-		fmt.Fprintf(os.Stderr, "semantic: %s — rebuilding the index (one time)\n", why)
+	if err := ensureEmbedReady(); err != nil {
+		return err
 	}
+	if why, err := st.RebuildReason(true); err == nil && why != "" {
+		stderrf("semantic: %s — rebuilding the index (one time)", why)
+	}
+	stop := withIndexProgress(st)
 	rep, err := st.Reindex(g.resolvedVault(), embed.Get, c.Force)
+	stop()
 	if err != nil {
 		return err
 	}
@@ -169,6 +247,50 @@ type LangsCmd struct{}
 
 func (c *LangsCmd) Run(_ *Globals) error {
 	fmt.Println(strings.Join(chunk.LanguageNames(), "\n"))
+	return nil
+}
+
+// ModelsCmd prints the embedding models --model accepts, marking the one in
+// force. Switching models re-embeds the index, so the dimension and the window
+// are shown alongside: they are what the choice actually trades off.
+type ModelsCmd struct {
+	JSON bool `help:"Emit the model list as JSON instead of tab-separated rows."`
+}
+
+func (c *ModelsCmd) Run(_ *Globals) error {
+	type row struct {
+		Name      string `json:"name"`
+		Dim       int    `json:"dim"`
+		MaxSeqLen int    `json:"max_seq_len"`
+		Pooling   string `json:"pooling"`
+		ApproxMB  int    `json:"approx_mb"`
+		Current   bool   `json:"current"`
+		Installed bool   `json:"installed"`
+	}
+	cur := embed.Current()
+	rows := make([]row, 0, len(embed.Models()))
+	for _, m := range embed.Models() {
+		rows = append(rows, row{
+			Name: m.Name, Dim: m.Dim, MaxSeqLen: m.MaxSeqLen,
+			Pooling: string(m.Pooling), ApproxMB: m.ApproxMB,
+			Current: m == cur, Installed: embed.Installed(m),
+		})
+	}
+	if c.JSON {
+		return printJSON(rows)
+	}
+	for _, r := range rows {
+		mark := " "
+		if r.Current {
+			mark = "*"
+		}
+		state := "not downloaded"
+		if r.Installed {
+			state = "installed"
+		}
+		fmt.Printf("%s %s\td%d\ts%d\t%s\t~%dMB\t%s\n",
+			mark, r.Name, r.Dim, r.MaxSeqLen, r.Pooling, r.ApproxMB, state)
+	}
 	return nil
 }
 
@@ -215,11 +337,21 @@ func (c *SearchCmd) Run(g *Globals) error {
 		return err
 	}
 
+	// Before openForRead, which only fetches the model when it is about to
+	// reindex. The query is embedded either way, so --no-reindex must not
+	// leave search without a model.
+	if err := ensureEmbedReady(); err != nil {
+		return err
+	}
+
 	st, _, err := g.openForRead(false)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = st.Close() }()
+	if err := assertVectorsComparable(st); err != nil {
+		return err
+	}
 
 	kind := search.KindAny
 	switch {
@@ -229,7 +361,7 @@ func (c *SearchCmd) Run(g *Globals) error {
 		kind = search.KindCode
 	}
 
-	hits, err := search.Query(st, embed.Get, c.Query, search.Options{
+	hits, err := search.Query(st, embed.GetQuery, c.Query, search.Options{
 		Limit:      c.Limit,
 		PathPrefix: c.Path,
 		MinScore:   c.MinScore,
@@ -281,6 +413,9 @@ func (c *DupesCmd) Run(g *Globals) error {
 		return err
 	}
 	defer func() { _ = st.Close() }()
+	if err := assertVectorsComparable(st); err != nil {
+		return err
+	}
 
 	pairs, err := search.Duplicates(st, search.DupeOptions{
 		MinScore:   c.MinScore,
@@ -348,7 +483,7 @@ type GraphCmd struct {
 }
 
 func (c *GraphCmd) Run(g *Globals) error {
-	st, vault, err := g.openForRead(false)
+	st, vault, err := g.openForRead(true)
 	if err != nil {
 		return err
 	}
@@ -438,11 +573,11 @@ type LintCmd struct {
 	Toc       bool     `help:"Show only long files missing an up-to-date Contents TOC."`
 	Fix       bool     `help:"Rewrite the auto-fixable findings (unlinked refs → real links, deep links → root-absolute, TOCs regenerated) in place; reindex after."`
 	JSON      bool     `help:"Emit the full report as JSON."`
-	NoEmbed   bool     `name:"no-embed" help:"Skip embedding during the auto-reindex — lint never reads a chunk's vector. Faster on a cold index (e.g. CI), but chunks indexed this way get a placeholder vector until a later 'semantic index'/search/dupes run embeds them for real; don't use on an index also relied on for search."`
+	NoEmbed   bool     `name:"no-embed" hidden:"" help:"Deprecated no-op: lint never embeds. Accepted so existing hooks and CI keep working."`
 }
 
 func (c *LintCmd) Run(g *Globals) error {
-	st, vault, err := g.openForRead(c.NoEmbed)
+	st, vault, err := g.openForRead(true)
 	if err != nil {
 		return err
 	}
@@ -495,8 +630,8 @@ func (c *LintCmd) narrowReport(st *index.Store, vault string, rep *lint.Report) 
 	// wantTOC mirrors the kind-narrowing below: MissingTOC only survives when
 	// no kind flag is set (default: everything) or --toc is. Skipping the
 	// audit otherwise avoids reading every file in scope from disk only to
-	// throw the result away — the whole point of a category-narrowed,
-	// --no-embed call like the CI removed-path scan.
+	// throw the result away — the whole point of a category-narrowed call
+	// like the CI removed-path scan.
 	wantTOC := (!c.Unlinked && !c.Ambiguous && !c.Broken && !c.Deep) || c.Toc
 	if wantTOC {
 		tocFiles := scope
@@ -947,13 +1082,14 @@ func editInPlace(vault, rel string, transform func(content string) (string, bool
 type CLI struct {
 	Globals
 
-	Init    InitCmd          `cmd:"" help:"Download the embedding model + ONNX runtime (~120MB, one-time)."`
+	Init    InitCmd          `cmd:"" help:"Download the embedding model + ONNX runtime (~160MB, one-time)."`
 	Index   IndexCmd         `cmd:"" help:"Index/reindex markdown + code under the vault (--vault, default cwd)."`
 	Search  SearchCmd        `cmd:"" help:"Semantic search over the index."`
 	Langs   LangsCmd         `cmd:"" help:"List the languages --lang accepts."`
 	Dupes   DupesCmd         `cmd:"" help:"Report near-duplicate chunks (redundant docs/guidance)."`
 	Graph   GraphCmd         `cmd:"" help:"Inspect the document link graph (orphans, broken links, backlinks)."`
 	Lint    LintCmd          `cmd:"" help:"Flag link hygiene: inline-code paths that should be links, and deep relative links."`
+	Models  ModelsCmd        `cmd:"" help:"List the embedding models --model accepts."`
 	Status  StatusCmd        `cmd:"" help:"Show index + model health."`
 	Version kong.VersionFlag `help:"Print version and exit."`
 }
@@ -991,7 +1127,31 @@ func main() {
 		kong.UsageOnError(),
 		kong.Vars{"version": versionString()},
 	)
-	if err := ctx.Run(&cli.Globals); err != nil {
+	// Before any command runs, because the choice decides which weights load,
+	// which cache directory is read, and which representation the index is
+	// stamped with. A name that does not resolve has to stop here rather than
+	// quietly fall through to the default and embed with something the user
+	// did not ask for.
+	if err := embed.Select(cli.Model); err != nil {
+		fmt.Fprintln(os.Stderr, "semantic:", err)
+		os.Exit(1)
+	}
+
+	// A model download is over a hundred megabytes and the only sign of life
+	// was one line before it started. Installed here rather than in each
+	// command because any of them may trigger a fetch.
+	status = newStatusLine()
+	embed.SetProgress(func(name string, done, total int64) {
+		if total > 0 {
+			status.set(fmt.Sprintf("  ↓ %s  %s / %s  (%d%%)",
+				name, humanBytes(done), humanBytes(total), done*100/total), false)
+			return
+		}
+		status.set(fmt.Sprintf("  ↓ %s  %s", name, humanBytes(done)), false)
+	})
+	err := ctx.Run(&cli.Globals)
+	status.done()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "semantic:", err)
 		os.Exit(1)
 	}

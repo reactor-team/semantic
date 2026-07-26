@@ -2,14 +2,19 @@
 # come back clean.
 #
 # This is the one script that drives the whole pipeline — SQLite index, chunker,
-# link extractor, lint analysis, and the in-place rewriter — because
-# `--no-embed` is the path that reaches all of it without the ONNX model. It is
-# also the shape a pre-commit hook uses.
+# link extractor, lint analysis, and the in-place rewriter — because lint
+# reaches all of it without the ONNX model. It is also the shape a pre-commit
+# hook uses.
 
 env SEMANTIC_CACHE_DIR=$WORK/cache
 
 # A finding is an error exit, not just a printed list. A hook that runs lint
 # has to be able to fail the commit on the status code alone.
+#
+# --no-embed is passed once, here, and nowhere else: it became a no-op when
+# skipping embedding turned into the default, and it stays accepted because
+# hooks and CI in other repositories still pass it. This asserts it still
+# parses.
 ! semantic lint --no-embed
 stderr 'reindexed 2 changed file\(s\)'
 stdout 'unlinked references \(1\)'
@@ -25,7 +30,7 @@ stdout 'unlinked references \(1\)'
 # names the command that does it.
 stdout 'fix \(auto\): run `semantic lint --fix`'
 
-semantic lint --no-embed --fix
+semantic lint --fix
 stdout 'linked 1 unlinked reference\(s\) across 1 file\(s\)'
 # The rewrite keeps the original path as the visible label and makes the target
 # root-absolute, so the rendered page reads the same as before.
@@ -35,7 +40,7 @@ cmp README.md README.fixed
 # Only the flagged reference moved. The fixer edits the span it found and
 # leaves the rest of the file alone, including the link it deliberately did
 # not flag.
-semantic lint --no-embed
+semantic lint
 stdout 'no lint issues flagged'
 ! stdout 'unlinked'
 
@@ -44,7 +49,7 @@ stderr 'reindexed 1 changed file\(s\)'
 
 # Running the fixer with nothing to fix is a no-op that still succeeds, which
 # is what makes it safe to wire into a hook unconditionally.
-semantic lint --no-embed --fix
+semantic lint --fix
 ! stdout 'linked 1'
 
 -- README.md --

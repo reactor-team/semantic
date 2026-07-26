@@ -18,71 +18,54 @@ func vecEqual(a, b []float32) bool {
 	return true
 }
 
-// meanPool averages over the real tokens only. The padding a batch adds
-// carries no meaning, and letting it into the average would pull every short
-// chunk's vector toward the same point.
-func TestMeanPool(t *testing.T) {
+// clsPool takes the first token and nothing else. bge-small-en-v1.5 puts the
+// sentence representation at the [CLS] position, so the later tokens are not
+// averaged in — including any the caller masked out, which is why clsPool needs
+// no mask at all.
+func TestClsPool(t *testing.T) {
 	t.Parallel()
 	// Three tokens, two dimensions each.
 	hidden := []float32{
-		1, 2, // token 0
+		1, 2, // token 0 — [CLS]
 		3, 4, // token 1
-		99, 99, // token 2 — masked out
+		99, 99, // token 2
 	}
-	mask := []int64{1, 1, 0}
-	got := meanPool(hidden, mask, 3, 2)
-	if want := []float32{2, 3}; !vecEqual(got, want) {
-		t.Errorf("meanPool = %v, want %v", got, want)
-	}
-}
-
-// A fully masked input has nothing to average. The count guard returns zeros
-// rather than dividing by zero and producing NaN, which would poison every
-// later cosine comparison in the index.
-func TestMeanPool_AllMasked(t *testing.T) {
-	t.Parallel()
-	got := meanPool([]float32{5, 6, 7, 8}, []int64{0, 0}, 2, 2)
-	if want := []float32{0, 0}; !vecEqual(got, want) {
-		t.Errorf("meanPool with an empty mask = %v, want %v", got, want)
+	got := clsPool(hidden, 2)
+	if want := []float32{1, 2}; !vecEqual(got, want) {
+		t.Errorf("clsPool = %v, want %v", got, want)
 	}
 }
 
-// seqLen is the truncated length, which may be shorter than the hidden state
-// the model returned. Pooling must stop at seqLen and not read past it.
-func TestMeanPool_HonoursSeqLen(t *testing.T) {
-	t.Parallel()
-	hidden := []float32{1, 1, 2, 2, 100, 100}
-	got := meanPool(hidden, []int64{1, 1}, 2, 2)
-	if want := []float32{1.5, 1.5}; !vecEqual(got, want) {
-		t.Errorf("meanPool = %v, want %v", got, want)
-	}
-}
-
-// A hidden state shorter than seqLen means the model returned a shape this
-// code did not expect. Pooling stops at what is actually there, so an index
-// run degrades to a short average instead of panicking partway through.
-func TestMeanPool_ShortInputsDoNotPanic(t *testing.T) {
+// A hidden state shorter than the dimension means the model returned a shape
+// this code did not expect. Pooling takes what is there and leaves the rest
+// zero, so an index run degrades instead of panicking partway through.
+func TestClsPool_ShortInputsDoNotPanic(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name   string
 		hidden []float32
-		mask   []int64
-		seqLen int
+		dim    int
 		want   []float32
 	}{
-		// Two dimensions promised for three tokens, one token delivered.
-		{"hidden truncated", []float32{4, 6}, []int64{1, 1, 1}, 3, []float32{4, 6}},
-		// The mask runs out first; the tokens it does not cover are dropped.
-		{"mask truncated", []float32{1, 1, 9, 9}, []int64{1}, 2, []float32{1, 1}},
-		{"nothing at all", nil, nil, 4, []float32{0, 0}},
+		{"hidden truncated", []float32{4}, 2, []float32{4, 0}},
+		{"nothing at all", nil, 2, []float32{0, 0}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := meanPool(tc.hidden, tc.mask, tc.seqLen, 2); !vecEqual(got, tc.want) {
-				t.Errorf("meanPool = %v, want %v", got, tc.want)
+			if got := clsPool(tc.hidden, tc.dim); !vecEqual(got, tc.want) {
+				t.Errorf("clsPool = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// A non-positive dimension asks for no vector at all. Returning an empty slice
+// keeps the caller on the same path as any other degenerate shape.
+func TestClsPool_ZeroDim(t *testing.T) {
+	t.Parallel()
+	if got := clsPool([]float32{1, 2, 3}, 0); len(got) != 0 {
+		t.Errorf("clsPool with dim 0 = %v, want empty", got)
 	}
 }
 
@@ -106,7 +89,7 @@ func TestNormalizeVec(t *testing.T) {
 }
 
 // A zero vector has no direction to normalize. It is left alone rather than
-// divided by zero — the same reason meanPool guards its count.
+// divided by zero, which would poison every later cosine comparison with NaN.
 func TestNormalizeVec_Zero(t *testing.T) {
 	t.Parallel()
 	v := []float32{0, 0, 0}
@@ -136,7 +119,7 @@ func TestNormalizeVec_Idempotent(t *testing.T) {
 func TestPoolThenNormalize(t *testing.T) {
 	t.Parallel()
 	hidden := []float32{0.5, -0.25, 1, 0.75, 0, 0}
-	v := meanPool(hidden, []int64{1, 1, 0}, 3, 2)
+	v := clsPool(hidden, 2)
 	normalizeVec(v)
 	if got := CosineSim(v, v); math.Abs(got-1) > 1e-9 {
 		t.Errorf("self-similarity of a pooled+normalized vector = %v, want 1", got)
@@ -144,7 +127,7 @@ func TestPoolThenNormalize(t *testing.T) {
 }
 
 // TestGet_RealModel exercises the ONNX path when the model happens to be
-// installed, and skips otherwise. Inference needs a ~90 MB download and a
+// installed, and skips otherwise. Inference needs a ~127 MB download and a
 // native runtime, so CI does not have it — but a developer who has run
 // `semantic init` gets the one check the pure functions above cannot make:
 // that the whole pipeline produces a usable vector space.
@@ -157,8 +140,8 @@ func TestGet_RealModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if len(v) != modelDim {
-		t.Fatalf("Get returned %d dimensions, want %d", len(v), modelDim)
+	if len(v) != Current().Dim {
+		t.Fatalf("Get returned %d dimensions, want %d", len(v), Current().Dim)
 	}
 	if got := CosineSim(v, v); math.Abs(got-1) > 1e-6 {
 		t.Errorf("Get returned an unnormalized vector: self-similarity %v", got)

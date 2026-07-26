@@ -1,0 +1,172 @@
+# Retrieval, end to end, against the real embedding model.
+#
+# Every other script here avoids embedding. This one runs the whole path —
+# tokenizer, ONNX session, pooling, normalization, cosine ranking — over a
+# vault that is deliberately mixed: ops runbooks, a policy note, a design doc
+# with nested headings, Go, Python, and YAML. Each query is worded to share no
+# distinctive term with the chunk it should find, so a keyword match would
+# score zero on all of them.
+#
+# The assertions name the breadcrumb, not just the file. Two of them point
+# inside a file with more than one symbol or section, so a match proves the
+# chunker and the ranking agreed on *which part* answers the query — the thing
+# file-level assertions cannot distinguish.
+#
+# What this does NOT do is measure quality, and it should not be extended in
+# that direction. Both known silent-degradation bugs for this checkpoint —
+# mean-pooling instead of CLS, and dropping the query prefix — were run against
+# an earlier version of this vault as negative controls, and both still ranked
+# correctly; mean pooling in fact scored better. Top-1 over a handful of short
+# documents is too coarse to see the difference. What it catches is a pipeline
+# broken outright. The representation itself is pinned by exact assertions in
+# pkg/embed, which need no ranking judgement. To compare checkpoints, use the
+# benchmark in bench_test.go, which reports a score rather than a verdict.
+#
+# Skipped where the model is absent, so CI stays offline and a contributor who
+# has run `semantic init` gets the check for free.
+
+[!embed] skip 'needs the embedding model — run: semantic init'
+
+env SEMANTIC_CACHE_DIR=$WORK/cache
+env SEMANTIC_MODEL_DIR=$REAL_MODEL_DIR
+env SEMANTIC_ORT_LIB=$REAL_ORT_LIB
+
+semantic index
+stdout 'indexed 8 files'
+
+# -n 1 is the assertion: one hit is printed, so a match proves rank 1 rather
+# than presence somewhere down the list.
+
+# Markdown, and the nearest distractor is disk.md — both describe a degraded
+# machine. "take forever to load" ↔ "ninety-fifth percentile past two seconds".
+semantic search --no-reindex -n 1 'pages take forever to load but nothing is broken'
+stdout '^runbooks/latency\.md'
+
+# "rate limit" ↔ "a fixed number of calls per minute".
+semantic search --no-reindex -n 1 'a customer is hitting the rate limit'
+stdout '^runbooks/throttling\.md'
+
+# A different register from the runbooks — policy prose rather than
+# instructions. "how long do we keep" ↔ "live for seven years after".
+semantic search --no-reindex -n 1 'how long do we keep customer records'
+stdout '^retention\.md'
+
+# A heading-tree chunk, and the breadcrumb is asserted: storage.md has two
+# sections, and only one answers this.
+semantic search --no-reindex -n 1 'why did we pick one big table over many small ones'
+stdout 'Why one wide table › The shape we chose'
+
+# Go, by doc comment and signature — the body is never embedded. worker.go
+# holds two functions, so the breadcrumb proves the right symbol won.
+# "drain in-flight requests" ↔ "waits for the ones already running to finish".
+semantic search --no-reindex -n 1 'gracefully drain in-flight requests on shutdown'
+stdout 'worker › Drain'
+
+# Python, by docstring, and again the file holds two functions.
+# "numbers or dates" ↔ "numbers, dates, or free text".
+semantic search --no-reindex -n 1 'guess whether a column holds numbers or dates'
+stdout 'etl\.py.*infer_types'
+
+# YAML, which chunks by document rather than by symbol.
+semantic search --no-reindex -n 1 'how much memory the container is allowed'
+stdout '^deploy\.yaml'
+
+# A recorded limitation, not an oversight: no query here claims worker.Backoff.
+# Four phrasings of what it does — "exponential delay between retries",
+# "doubling the delay after each failure", "how long to pause before trying a
+# failed request again", "spacing out repeated attempts" — all rank a markdown
+# chunk above it, and two of them do not put it in the top two at all. The
+# short doc comment on a symbol competes badly against a paragraph of prose.
+# Written down rather than papered over with an easier vault, because it is the
+# kind of thing a future checkpoint should be measured on.
+
+-- runbooks/latency.md --
+# Responses have gotten slow
+
+Nothing is returning an error, but the ninety-fifth percentile has climbed past
+two seconds. Start at the database: a query that lost its index will do this
+long before it starts failing. Check the slow query log for the window where
+the curve bent upward.
+
+-- runbooks/throttling.md --
+# Clients are being rejected with 429
+
+Each key is allowed a fixed number of calls per minute, and a caller that
+exceeds it gets refused until the window rolls over. A single noisy integration
+is the common cause. Raise its ceiling deliberately rather than lifting the
+global one.
+
+-- runbooks/disk.md --
+# The volume is full
+
+Writes begin failing once the underlying block device has no room left. The
+usual cause is log rotation that stopped running, not real growth in stored
+data. Truncate the oldest archives first, then fix the rotation job.
+
+-- retention.md --
+# How long records are kept
+
+Account records live for seven years after the final invoice, which is what the
+tax authority requires. Request logs are discarded after ninety days. A person
+who asks to be forgotten has the account row anonymized rather than deleted,
+because the invoice history has to survive them.
+
+-- design/storage.md --
+# Why one wide table
+
+## Contents
+
+- The shape we chose
+- What it costs
+
+## The shape we chose
+
+Every event lands in a single append-only table keyed by tenant and time.
+Splitting per tenant was considered and rejected: the operational burden of
+thousands of small objects outweighed the isolation it would have bought.
+
+## What it costs
+
+A tenant reading its own history scans rows belonging to others and discards
+them. That is acceptable while the largest tenant stays under a few percent of
+total volume, and it stops being acceptable after.
+
+-- worker.go --
+package worker
+
+import "time"
+
+// Backoff returns how long to wait before attempt n, doubling each time up to
+// a ceiling. Spreading repeated failures out is what keeps a struggling
+// dependency from being hammered by everyone retrying in lockstep.
+func Backoff(n int) time.Duration { return 0 }
+
+// Drain stops accepting new items and waits for the ones already running to
+// finish, so a shutdown does not abandon work halfway through.
+func Drain(timeout time.Duration) error { return nil }
+
+-- etl.py --
+def to_columnar(src, dst):
+    """Convert a comma-separated export into a columnar file on disk.
+
+    Row-oriented text is read once and rewritten so that each field is stored
+    together, which is what makes later analytical scans cheap.
+    """
+    return None
+
+
+def infer_types(rows):
+    """Guess whether each field holds numbers, dates, or free text."""
+    return {}
+
+-- deploy.yaml --
+resources:
+  limits:
+    memory: 2Gi
+    cpu: "1"
+  requests:
+    memory: 512Mi
+probes:
+  readiness:
+    path: /healthz
+    initialDelaySeconds: 5

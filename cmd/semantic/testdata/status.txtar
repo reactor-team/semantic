@@ -14,9 +14,9 @@ stdout 'run: semantic init'
 stdout 'not created yet — run: semantic index'
 
 # The model is missing but the index is not: the two are reported separately
-# because lint and graph work on an index built with --no-embed, and a user
-# with that setup should not be told their index is broken.
-semantic lint --no-embed
+# because lint and graph build and read an index without ever embedding, and a
+# user with that setup should not be told their index is broken.
+semantic lint
 
 semantic status
 stdout '^model:   not ready'

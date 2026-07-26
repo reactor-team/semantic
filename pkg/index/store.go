@@ -70,8 +70,21 @@ CREATE TABLE meta (
 
 // Store wraps the SQLite index database.
 type Store struct {
-	db *sql.DB
+	db       *sql.DB
+	progress Progress
 }
+
+// Progress is called once per file as Reindex walks the tree, with the file's
+// vault-relative path and how many files have been reached so far. There is no
+// total: the walk discovers the tree as it goes, and counting it first would
+// mean a second full traversal to make a denominator nobody needs to see a
+// command is alive.
+type Progress func(rel string, done int)
+
+// SetProgress installs the hook Reindex reports through, or nil for none.
+// Embedding is the slow part of indexing, and on a large tree it is minutes
+// during which the process otherwise looks hung.
+func (s *Store) SetProgress(fn Progress) { s.progress = fn }
 
 // DefaultDBPath is where the index lives for a given vault root:
 // <vault>/.semantic/index.db. Per-vault, gitignorable, travels with the tree.

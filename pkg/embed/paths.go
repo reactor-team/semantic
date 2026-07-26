@@ -26,6 +26,15 @@ func Check() error {
 	return nil
 }
 
+// Installed reports whether m's files are already on disk, without disturbing
+// the current selection. `semantic models` uses it to say which checkpoints a
+// switch would cost a download, and which are already paid for.
+func Installed(m *Model) bool {
+	dir := modelDirFor(m.Name)
+	return fileExists(filepath.Join(dir, "model.onnx")) &&
+		fileExists(filepath.Join(dir, "tokenizer.json"))
+}
+
 // cacheRoot is the home for regeneratable artifacts — the ONNX Runtime
 // shared library and the embedding model files. On a fresh machine these
 // can always be re-downloaded, so they belong under the OS-conventional
@@ -51,11 +60,28 @@ func cacheRoot() string {
 
 // ModelCacheDir returns the directory where model files are cached.
 // $SEMANTIC_MODEL_DIR overrides.
+//
+// The selected checkpoint names the path, for the reason OrtCacheDir keys on
+// OrtVersion: model.onnx at a shared path would make a checkpoint change find
+// the previous weights already there and skip the download. That failure is
+// worse than the runtime's, because it is silent — the old weights load,
+// pooling still runs, and the index fills with vectors from a model the caller
+// did not choose. Keying by checkpoint also lets several models sit side by
+// side, which is what makes switching back and forth cost nothing after the
+// first fetch of each.
 func ModelCacheDir() string {
 	if v := strings.TrimSpace(os.Getenv("SEMANTIC_MODEL_DIR")); v != "" {
 		return v
 	}
-	return filepath.Join(cacheRoot(), "models", "all-minilm-l6-v2")
+	return modelDirFor(Current().Name)
+}
+
+// modelDirFor is the cache path for one checkpoint by name, separate from
+// ModelCacheDir so Installed can ask about a model that is not selected.
+// $SEMANTIC_MODEL_DIR is deliberately not consulted here: it names one
+// directory, so it can only mean the model actually in use.
+func modelDirFor(name string) string {
+	return filepath.Join(cacheRoot(), "models", strings.ToLower(name))
 }
 
 // OrtCacheDir returns the directory where the ONNX Runtime library is cached.

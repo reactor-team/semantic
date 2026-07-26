@@ -252,7 +252,7 @@ func TestDownloadFile(t *testing.T) {
 
 	dir := t.TempDir()
 	dest := filepath.Join(dir, "model.onnx")
-	if err := downloadFile(srv.URL, dest); err != nil {
+	if err := downloadFile(srv.URL, "test", dest); err != nil {
 		t.Fatalf("downloadFile: %v", err)
 	}
 	if got := readFile(t, dest); got != "model bytes" {
@@ -280,7 +280,7 @@ func TestDownloadFile_HTTPError(t *testing.T) {
 	defer srv.Close()
 
 	dest := filepath.Join(t.TempDir(), "model.onnx")
-	err := downloadFile(srv.URL, dest)
+	err := downloadFile(srv.URL, "test", dest)
 	if err == nil || !strings.Contains(err.Error(), "HTTP 404") {
 		t.Fatalf("downloadFile = %v, want an HTTP 404 error", err)
 	}
@@ -291,7 +291,7 @@ func TestDownloadFile_HTTPError(t *testing.T) {
 
 // DownloadOrt and DownloadModel are idempotent: with everything cached they
 // report what they found and make no request. `semantic init` is documented as
-// safe to re-run, and a second run must not re-fetch 90 MB.
+// safe to re-run, and a second run must not re-fetch 127 MB.
 func TestDownloadAll_AlreadyCached(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("SEMANTIC_CACHE_DIR", root)

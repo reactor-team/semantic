@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,14 +23,6 @@ import (
 // tests skip inference when no model is installed — so the versions move
 // together, in one commit, or not at all.
 const OrtVersion = "1.26.0"
-
-// ModelURL and TokenizerURL are where `semantic init` fetches the embedding
-// model. ModelURL is the full model (~86MB); the quantized model
-// (model_quantized.onnx) is ~23MB.
-const (
-	ModelURL     = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx"
-	TokenizerURL = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/tokenizer.json" //nolint:gosec // G101 false positive: a public asset URL, not a credential
-)
 
 // OrtDownloadURL returns the GitHub release URL for the ORT shared library
 // archive for the current platform.
@@ -64,6 +57,67 @@ func OrtDownloadURL() string {
 		)
 	}
 }
+
+// ensureMu serializes EnsureModel so concurrent callers fetch the model once
+// between them rather than once each. Like initMu, it is a mutex and not a
+// sync.Once: a download that fails on a flaky network must stay retryable
+// instead of being cached as failed for the life of the process.
+var ensureMu sync.Mutex
+
+// EnsureModel downloads whatever Check reports missing, and does nothing when
+// everything is already cached. It exists so a command that is about to embed
+// can heal itself instead of failing with an instruction to run `init` and be
+// run a second time.
+//
+// A checkpoint change is the case it is really for: ModelCacheDir moves with
+// the checkpoint, so an upgraded binary finds nothing at the new path, on a
+// machine whose owner has run `init` once already and reasonably believes the
+// model is installed. The reindex that same upgrade triggers is automatic, and
+// a manual step in the middle of an otherwise invisible migration is the part
+// a user would experience as breakage.
+//
+// Get does not call this. A library that fetches a hundred-odd MB because something
+// imported it is a surprise no caller asked for; the choice to spend the
+// bandwidth belongs to the command, which is also the thing with somewhere to
+// report progress.
+//
+// $SEMANTIC_NO_DOWNLOAD turns it back into a check, for a sandbox or an
+// air-gapped machine where an unasked-for hundred-MB fetch is worse than the error
+// it avoids. The test suite sets it so no script can spend the bandwidth by
+// accident.
+func EnsureModel(logf func(string, ...any)) error {
+	ensureMu.Lock()
+	defer ensureMu.Unlock()
+	// Re-checked under the lock, not before it: a caller that queued behind a
+	// download in progress finds the files there and returns without starting
+	// a second one.
+	err := Check()
+	if err == nil {
+		return nil
+	}
+	if strings.TrimSpace(os.Getenv("SEMANTIC_NO_DOWNLOAD")) != "" {
+		return err
+	}
+	return DownloadAll(logf)
+}
+
+// Progress reports how far a single file's download has got. total is the
+// size the server advertised, or 0 when it advertised none — a caller showing
+// a percentage has to handle that, because Hugging Face redirects to a CDN
+// that does not always send Content-Length.
+//
+// It is a package-level hook rather than a parameter threaded through five
+// functions because it is presentation, and every one of those functions
+// otherwise has nothing to say about how bytes are displayed. nil means the
+// caller wants none, which is the default and what every test gets.
+type Progress func(name string, done, total int64)
+
+var progressFn Progress
+
+// SetProgress installs the hook downloads report through. Pass nil to silence
+// it. Not safe against a download already running; the CLI sets it once at
+// startup.
+func SetProgress(fn Progress) { progressFn = fn }
 
 // DownloadAll downloads the ONNX Runtime library and model files.
 // logf receives progress messages.
@@ -114,14 +168,15 @@ func DownloadModel(logf func(string, ...any)) error {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
+	m := Current()
 	modelPath := filepath.Join(dir, "model.onnx")
 	tokPath := filepath.Join(dir, "tokenizer.json")
 
 	if fileExists(modelPath) {
 		logf("  ✓ Model already cached at %s", modelPath)
 	} else {
-		logf("  ↓ Downloading all-MiniLM-L6-v2 model (~86 MB)...")
-		if err := downloadFile(ModelURL, modelPath); err != nil {
+		logf("  ↓ Downloading %s model (~%d MB)...", m.Name, m.ApproxMB)
+		if err := downloadFile(m.ModelURL, m.Name+" model", modelPath); err != nil {
 			return fmt.Errorf("model download: %w", err)
 		}
 		logf("  ✓ Saved to %s", modelPath)
@@ -131,7 +186,7 @@ func DownloadModel(logf func(string, ...any)) error {
 		logf("  ✓ Tokenizer already cached at %s", tokPath)
 	} else {
 		logf("  ↓ Downloading tokenizer.json...")
-		if err := downloadFile(TokenizerURL, tokPath); err != nil {
+		if err := downloadFile(m.TokenizerURL, "tokenizer", tokPath); err != nil {
 			return fmt.Errorf("tokenizer download: %w", err)
 		}
 		logf("  ✓ Saved to %s", tokPath)
@@ -252,8 +307,10 @@ func extractOrtLibFromZip(r io.Reader, destPath string) error {
 	return fmt.Errorf("onnxruntime.dll not found in zip — check ORT release URL")
 }
 
-// downloadFile downloads url to destPath atomically (temp file + rename).
-func downloadFile(url, destPath string) error {
+// downloadFile downloads url to destPath atomically (temp file + rename),
+// reporting bytes through the Progress hook as they arrive. name is what the
+// hook shows the user; the URL is not, being mostly a CDN path nobody reads.
+func downloadFile(url, name, destPath string) error {
 	resp, err := httpGet(url)
 	if err != nil {
 		return err
@@ -267,12 +324,34 @@ func downloadFile(url, destPath string) error {
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath) // no-op after successful rename
 
-	if _, err := io.Copy(tmp, resp.Body); err != nil {
+	var src io.Reader = resp.Body
+	if progressFn != nil {
+		src = &progressReader{r: resp.Body, name: name, total: resp.ContentLength}
+	}
+	if _, err := io.Copy(tmp, src); err != nil {
 		tmp.Close()
 		return fmt.Errorf("writing %s: %w", url, err)
 	}
 	tmp.Close()
 	return os.Rename(tmpPath, destPath)
+}
+
+// progressReader counts bytes on their way past and hands the running total to
+// the Progress hook. Rate limiting belongs to the hook, not here: this cannot
+// know how expensive the display is, and a reader that decided for itself
+// would have to guess.
+type progressReader struct {
+	r     io.Reader
+	name  string
+	total int64
+	done  int64
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	p.done += int64(n)
+	progressFn(p.name, p.done, p.total)
+	return n, err
 }
 
 func httpGet(url string) (*http.Response, error) {

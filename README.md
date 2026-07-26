@@ -22,6 +22,7 @@ notes.
     - What `lint` flags
     - Fixing and suppressing
 - Configuration
+  - Choosing a model
 - Development
 - Contributing
 - License
@@ -34,7 +35,7 @@ are 90% redundant or which links rot. `semantic` runs a real embedding model on
 your machine to answer both kinds of question — retrieval *and* corpus hygiene —
 without shipping your notes to anyone.
 
-- **Local & offline.** all-MiniLM-L6-v2 (384-dim) runs via onnxruntime; the
+- **Local & offline.** arctic-embed-xs (384-dim) runs via onnxruntime; the
   model + runtime download once (~120MB) and never phone home.
 - **Fast & incremental.** Content is chunked, embedded, and stored in SQLite;
   reindexing only re-embeds files whose content hash changed.
@@ -138,6 +139,7 @@ it travels with the tree.
 | `semantic graph` | Inspect the document link graph: orphans, broken links, broken `#section` anchors, backlinks. |
 | `semantic lint` | Flag docs hygiene: inline-code doc/source paths (`` `docs/x.md` ``, `` `pkg/file.go` ``) that should be links (or are ambiguous — a bare basename matching more than one file), deep relative links (`../../`) better written root-absolute, and long files missing an up-to-date `## Contents` TOC. `--fix` rewrites the auto-fixable ones. |
 | `semantic status` | Index + model health (DB path, file/chunk counts, last index time). |
+| `semantic models` | List the embedding models available, and mark the one in use. |
 
 Help is the source of truth — every command self-documents:
 
@@ -213,13 +215,54 @@ wants, since it silences the TOC check too.
 | Env var | Meaning |
 |---|---|
 | `SEMANTIC_DB` | Override the index database path (also `--db`). |
+| `SEMANTIC_MODEL` | Which embedding model to use (also `--model`). |
 | `SEMANTIC_CACHE_DIR` / `SEMANTIC_MODEL_DIR` | Where the model/runtime are cached. |
 | `SEMANTIC_ORT_LIB` | Path to a specific ONNX runtime shared library. |
+| `SEMANTIC_NO_DOWNLOAD` | Fail instead of fetching a missing model. |
 
 `search`, `dupes`, `graph`, and `lint` incrementally reindex the vault before
 answering (a stat-only no-op when nothing changed), so they never silently
 read a stale index. Pass `--no-reindex` to skip this and read the index
-exactly as it was after the last explicit `semantic index`.
+exactly as it was after the last explicit `semantic index`. `graph` and `lint`
+reindex without embedding, because neither ever reads a vector — chunks they
+add carry a placeholder that the next `search`, `dupes`, or `semantic index`
+fills in.
+
+### Choosing a model
+
+`semantic models` lists what is available and marks the one in use:
+
+```
+$ semantic models
+  all-MiniLM-L6-v2  d384  s256  mean  ~90MB   not downloaded
+* arctic-embed-xs  d384  s512  cls   ~90MB   installed
+  bge-small-en-v1.5  d384  s512  cls   ~127MB  not downloaded
+  bge-small-en-v1.5-int8  d384  s512  cls   ~33MB   not downloaded
+```
+
+The columns are the dimension, the maximum sequence length in tokens, the
+pooling strategy, and the download size.
+
+`arctic-embed-xs` is the default: measured against a held-out set of real
+retrieval queries, it ranked results better than `bge-small-en-v1.5` — the
+prior default — at roughly two-thirds the download. Pass `--model NAME` or set
+`$SEMANTIC_MODEL` to use another; each is cached under its own directory, so
+switching back after the first download costs nothing.
+
+`bge-small-en-v1.5` stays in the registry: a released version depends on it,
+and it is still a strong checkpoint, just no longer the default.
+
+`bge-small-en-v1.5-int8` is the bge checkpoint with int8 weights: a quarter of
+its download for no measurable accuracy cost. It is not the default because it
+indexes about 17% slower on Apple Silicon, where ONNX Runtime pays to convert
+around each matmul rather than saving on the arithmetic. Prefer it when the
+download or the disk matters more than indexing time.
+
+Vectors from two models are not comparable, and the index records which one
+built it. Switching models therefore re-embeds the vault on the next command
+that ranks — announced before the work starts, not discovered afterwards. Under
+`--no-reindex`, where that healing is skipped, a mismatch is an error rather
+than a silently meaningless score.
 
 ## Development
 

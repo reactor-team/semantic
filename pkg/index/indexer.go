@@ -274,6 +274,12 @@ func (s *Store) Reindex(root string, embedFn Embedder, force bool) (*Report, err
 			return nil
 		}
 		seen[rel] = true
+		if s.progress != nil {
+			// Before the work, not after: the file named is the one being
+			// waited on. Reporting the one just finished leaves the slow file
+			// unnamed, which is the one the user wants named.
+			s.progress(rel, len(seen))
+		}
 		return s.indexFile(path, rel, d, chunkFn, pass)
 	})
 	if walkErr != nil {

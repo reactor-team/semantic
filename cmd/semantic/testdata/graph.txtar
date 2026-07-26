@@ -9,7 +9,7 @@ env SEMANTIC_CACHE_DIR=$WORK/cache
 
 # Build the index. lint is only the vehicle: it is the one command that
 # populates the index without embedding. This vault is clean, so it exits 0.
-semantic lint --no-embed
+semantic lint
 stdout 'no lint issues flagged'
 
 semantic graph --no-reindex

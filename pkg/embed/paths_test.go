@@ -58,7 +58,7 @@ func TestModelCacheDir(t *testing.T) {
 	t.Setenv("SEMANTIC_CACHE_DIR", root)
 	t.Setenv("SEMANTIC_MODEL_DIR", "")
 
-	want := filepath.Join(root, "models", "all-minilm-l6-v2")
+	want := filepath.Join(root, "models", DefaultModel)
 	if got := ModelCacheDir(); got != want {
 		t.Errorf("ModelCacheDir() = %q, want %q", got, want)
 	}

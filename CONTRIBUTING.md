@@ -162,9 +162,15 @@ fix.
 Table-driven tests are the house style — see [`pkg/chunk/chunk_test.go`](/pkg/chunk/chunk_test.go). Call
 `t.Parallel()` in any test and subtest that can support it.
 
-Do not write a test that reaches the network or requires a downloaded model. The
+No test may need the network or a downloaded model in order to pass. The
 embedding layer takes an injectable `Embedder`, and `pkg/index` tests pass `nil`
 to skip embedding entirely. Follow that pattern.
+
+A test that exercises the real model is allowed on one condition: it skips when
+the model is absent. `TestGet_RealModel` in `pkg/embed` and the `[embed]`-gated
+end-to-end scripts below both do that. They run for a contributor who has run
+`semantic init` and are skipped in CI, so the coverage is free where it exists
+and costs nothing where it does not.
 
 ### End-to-end scripts
 
@@ -174,9 +180,11 @@ scripts in [`cmd/semantic/testdata`](/cmd/semantic/testdata). Each `.txtar` file
 builds a vault, runs the real binary against it, and asserts on what came back.
 Add one when you change what a command prints or what it exits with.
 
-The scripts stay off the embedding path, because CI has no model. `lint
---no-embed` indexes a vault without embedding and `--no-reindex` lets the other
-commands read what it built — between them most of the program is reachable.
+The scripts stay off the embedding path, because CI has no model. `lint`
+indexes a vault without embedding and `--no-reindex` lets the other commands
+read what it built — between them most of the program is reachable. A script
+that needs the real model declares `[embed]` and is skipped where it is absent,
+so CI stays offline.
 Open a script with a comment saying which contract it pins and why that contract
 matters; the assertions are terse, so the comment is where the reasoning lives.
 

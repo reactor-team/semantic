@@ -68,6 +68,13 @@ and progress output for the commands that used to sit silent.
   fetch — for CI, and for anyone who would rather not have a command silently
   pull a checkpoint.
 
+### Fixed
+
+- **A bare `semantic` prints help instead of an error.** With no command it
+  exited non-zero with `error: expected one of "init", …` — a newcomer's first,
+  most natural invocation met a failure rather than the command list. It now
+  prints the same help `--help` does and exits 0.
+
 ## [0.1.2] — 2026-07-25
 
 Four corrections to what semantic says, three of them user-facing. Nothing

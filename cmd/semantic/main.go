@@ -1120,6 +1120,13 @@ func versionString() string {
 
 func main() {
 	var cli CLI
+	// A bare `semantic` is a request to see what the tool does, not a mistake.
+	// kong treats a missing command as a usage error and exits non-zero, so
+	// rewrite the empty invocation to --help: the same help, printed to stdout,
+	// exit 0.
+	if len(os.Args) == 1 {
+		os.Args = append(os.Args, "--help")
+	}
 	ctx := kong.Parse(
 		&cli,
 		kong.Name("semantic"),

@@ -27,3 +27,11 @@ stderr 'query'
 # An unknown flag is caught rather than passed through as part of the query.
 ! semantic search --nope 'x'
 stderr 'nope'
+
+# A bare invocation is a request for help, not an error: it prints the usage to
+# stdout and exits 0, so `semantic` alone shows a newcomer the commands rather
+# than a one-line failure.
+semantic
+! stderr .
+stdout 'Usage: semantic'
+stdout 'search <query>'

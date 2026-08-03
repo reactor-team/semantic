@@ -16,6 +16,8 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-08-03
+
 A better default embedding model, a registry so it is no longer the only one,
 and progress output for the commands that used to sit silent.
 
@@ -237,7 +239,8 @@ Initial public release.
   build-provenance attestation. The archives carry the binary only; `semantic
   init` fetches the model and runtime on first use.
 
-[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/reactor-team/semantic/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/reactor-team/semantic/releases/tag/v0.1.2
 [0.1.1]: https://github.com/reactor-team/semantic/releases/tag/v0.1.1
 [0.1.0]: https://github.com/reactor-team/semantic/releases/tag/v0.1.0

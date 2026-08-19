@@ -27,11 +27,15 @@ import (
 // Variant constants for the TypeScript chunk kinds without a Go analogue.
 // Functions, methods, and const/var reuse the func/method/value variants from
 // gosource.go, and a type alias reuses VariantType — they mean the same thing
-// across languages, so search filters and displays stay uniform.
+// across languages, so search filters and displays stay uniform. VariantFile
+// is the file's own documentation, which VariantPackage is for Go; it is not
+// VariantModule, which names a declared module or namespace in the languages
+// that have one.
 const (
 	VariantClass     = "class"
 	VariantInterface = "interface"
 	VariantEnum      = "enum"
+	VariantFile      = "file"
 )
 
 // tsValueSigMax caps how much of a plain const/var initializer is inlined into
@@ -91,6 +95,7 @@ func tsSource(content string, lang *sitter.Language) []Chunk {
 	defer tree.Close()
 
 	w := &tsWalker{source: source, seen: map[string]bool{}}
+	w.fileDoc(tree.RootNode())
 	w.walk(tree.RootNode(), "")
 	return w.out
 }
@@ -140,6 +145,77 @@ func (w *tsWalker) walk(container *sitter.Node, prefix string) {
 		w.declare(decl, prefix, doc)
 		doc = ""
 	}
+}
+
+// fileDoc emits a leading JSDoc block that documents no declaration as the
+// file's own chunk, the way GoSource emits a package doc.
+//
+// A file whose first statement is an import, or whose only export is a
+// re-export, leaves its leading block with nothing below it to own. The walk
+// then drops that block, which is how a file's own prose — the `@module` and
+// `@fileoverview` convention, and every design note written above the imports
+// — stayed out of the index. It is the highest-signal prose in such a file:
+// the symbols below it carry signatures, and only this says what the file is
+// for.
+func (w *tsWalker) fileDoc(root *sitter.Node) {
+	start := afterPrologue(root)
+	first := root.NamedChild(start)
+	if first == nil || first.Kind() != "comment" {
+		return
+	}
+	doc := jsDoc(first, w.source)
+	if doc == "" || documentsNext(root.NamedChild(start+1)) {
+		return
+	}
+	crumb := VariantFile
+	w.out = append(w.out, Chunk{
+		Key:     "ts/" + VariantFile,
+		Heading: crumb,
+		Variant: VariantFile,
+		Text:    crumb + "\n\n" + doc,
+		Line:    nodeLine(first),
+	})
+}
+
+// afterPrologue returns the index of the first child past a shebang and any
+// directive prologue, so `"use client"` above the doc block does not hide it.
+func afterPrologue(root *sitter.Node) uint {
+	index := uint(0)
+	for ; index < root.NamedChildCount(); index++ {
+		if !prologue(root.NamedChild(index)) {
+			break
+		}
+	}
+	return index
+}
+
+// prologue reports whether n is a shebang or a bare string statement, the two
+// things a file may carry above its own documentation.
+func prologue(n *sitter.Node) bool {
+	if n.Kind() == "hash_bang_line" {
+		return true
+	}
+	if n.Kind() != "expression_statement" || n.NamedChildCount() != 1 {
+		return false
+	}
+	return n.NamedChild(0).Kind() == "string"
+}
+
+// documentsNext reports whether the node after a leading comment is a
+// declaration the walk hands that comment to. An import, a re-export carrying
+// no declaration, a directive, a second comment block, and the end of the file
+// all leave the comment unowned, which makes it documentation about the file.
+func documentsNext(next *sitter.Node) bool {
+	if next == nil {
+		return false
+	}
+	switch next.Kind() {
+	case "comment", "import_statement":
+		return false
+	case "export_statement":
+		return next.ChildByFieldName("declaration") != nil
+	}
+	return !prologue(next)
 }
 
 // declare dispatches one declaration to the emitter for its kind.

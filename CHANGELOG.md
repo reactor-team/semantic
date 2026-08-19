@@ -16,6 +16,21 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+### Fixed
+
+- **[reindex]** **A TypeScript or JavaScript file's own documentation is now
+  indexed.** A leading `/** … */` block is a file's documentation when no
+  declaration follows it to own it — the `@fileoverview` and `@module`
+  convention, and any design note written above the imports. The walk dropped
+  it, because association is by adjacency and an `import`, a bare
+  `export {}`, or a re-export carries no symbol to attach it to. Such a file
+  therefore contributed only signatures to the index, and the one piece of
+  prose saying what the file is for was absent from search. It now emits as a
+  `file` chunk keyed `ts/file`, which is for TypeScript what the `package`
+  chunk is for Go. A shebang and a directive prologue (`"use client"`) are
+  skipped when looking for the block, in either order, and a doc block that
+  does document a declaration is untouched.
+
 ## [0.1.3] — 2026-08-03
 
 A better default embedding model, a registry so it is no longer the only one,

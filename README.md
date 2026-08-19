@@ -59,8 +59,8 @@ a body is implementation, and embedding it dilutes what the symbol is for.
 | Markdown | `.md` `.markdown` | Heading tree |
 | Go | `.go` | package · type · func · method · documented const/var |
 | Python | `.py` `.pyi` | module · class · method · func · documented constant |
-| TypeScript | `.ts` `.mts` `.cts` `.tsx` | func · class · interface · type · enum · const |
-| JavaScript | `.js` `.mjs` `.cjs` `.jsx` | func · class · CommonJS export |
+| TypeScript | `.ts` `.mts` `.cts` `.tsx` | file doc · func · class · interface · type · enum · const |
+| JavaScript | `.js` `.mjs` `.cjs` `.jsx` | file doc · func · class · CommonJS export |
 | Java | `.java` | class · interface · enum · record · method |
 | C# | `.cs` | namespace · class · interface · struct · record · method · property |
 | Rust | `.rs` | struct · enum · trait · mod · func · impl method |

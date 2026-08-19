@@ -243,3 +243,83 @@ module.exports = { sub, inline: (a, b) => a / b };`
 		t.Errorf("shorthand re-export should not duplicate sub, got %q", c.Key)
 	}
 }
+
+// sampleFileDocTS is a file whose leading block documents the file rather than
+// a symbol: an import follows it, so no declaration owns it.
+const sampleFileDocTS = `/**
+ * The widget store is the one place a widget's bytes are written.
+ *
+ * A write is idempotent, so a retry after a timeout costs a lookup rather
+ * than a duplicate.
+ */
+import { open } from "node:fs/promises";
+
+/** put writes one widget. */
+export function put(id: string): void {}
+`
+
+func TestTypeScript_FileDocBeforeImports(t *testing.T) {
+	t.Parallel()
+	got := TypeScript(sampleFileDocTS)
+	c := find(got, "ts/file")
+	if c.Key == "" {
+		t.Fatalf("no file chunk emitted (keys: %v)", keysOf(got))
+	}
+	if c.Variant != VariantFile {
+		t.Errorf("variant = %q, want %q", c.Variant, VariantFile)
+	}
+	if !strings.HasPrefix(c.Text, c.Heading) {
+		t.Errorf("text should lead with the breadcrumb, got %q", c.Text)
+	}
+	for _, want := range []string{"one place a widget's bytes are written", "A write is idempotent"} {
+		if !strings.Contains(c.Text, want) {
+			t.Errorf("file text missing %q, got %q", want, c.Text)
+		}
+	}
+	if put := find(got, "ts/func/put"); put.Key == "" {
+		t.Errorf("the declaration after the module doc is still chunked (keys: %v)", keysOf(got))
+	}
+}
+
+func TestTypeScript_FileDocWithoutDeclarations(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		source string
+	}{
+		{"re-export only", "/** A widget is a thing. */\nexport {};\n"},
+		{"nothing at all", "/** A widget is a thing. */\n"},
+		{"a second block below", "/** A widget is a thing. */\n\n/** put writes one. */\nexport function put(): void {}\n"},
+		{"a directive above", "\"use client\";\n\n/** A widget is a thing. */\nimport { open } from \"node:fs/promises\";\n"},
+		{"a directive below", "/** A widget is a thing. */\n\"use client\";\n"},
+		{"a shebang above", "#!/usr/bin/env node\n/** A widget is a thing. */\nimport { open } from \"node:fs/promises\";\n"},
+		{"a star export below", "/** A widget is a thing. */\nexport * from \"./widget\";\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if c := find(TypeScript(tc.source), "ts/file"); c.Key == "" {
+				t.Errorf("no file chunk emitted for %s", tc.name)
+			}
+		})
+	}
+}
+
+func TestTypeScript_DocumentedDeclarationKeepsItsDoc(t *testing.T) {
+	t.Parallel()
+	got := TypeScript("/** put writes one widget. */\nexport function put(): void {}\n")
+	if c := find(got, "ts/file"); c.Key != "" {
+		t.Errorf("a doc block owned by a declaration became a file chunk: %q", c.Text)
+	}
+	if c := find(got, "ts/func/put"); !strings.Contains(c.Text, "writes one widget") {
+		t.Errorf("declaration lost its doc, got %q", c.Text)
+	}
+}
+
+func TestTypeScript_LineCommentIsNotAModuleDoc(t *testing.T) {
+	t.Parallel()
+	got := TypeScript("// internal notes, not documentation\nimport { open } from \"node:fs/promises\";\n")
+	if c := find(got, "ts/file"); c.Key != "" {
+		t.Errorf("a line comment became a file chunk: %q", c.Text)
+	}
+}

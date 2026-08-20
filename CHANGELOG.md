@@ -16,6 +16,8 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-19
+
 ### Fixed
 
 - **[reindex]** **A TypeScript or JavaScript file's own documentation is now
@@ -30,6 +32,13 @@ so this is a note about cost rather than an instruction — `semantic index
   chunk is for Go. A shebang and a directive prologue (`"use client"`) are
   skipped when looking for the block, in either order, and a doc block that
   does document a declaration is untouched.
+
+### Security
+
+- **Built against Go 1.26.7.** Closes four standard-library advisories with a
+  call path reachable from the binary — GO-2026-5026 (net/http idna),
+  GO-2026-5972 (encoding/asn1), GO-2026-6090 (crypto/tls), and GO-2026-6218
+  (net/url) — all fixed in go1.26.6.
 
 ## [0.1.3] — 2026-08-03
 
@@ -254,7 +263,8 @@ Initial public release.
   build-provenance attestation. The archives carry the binary only; `semantic
   init` fetches the model and runtime on first use.
 
-[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/reactor-team/semantic/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/reactor-team/semantic/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/reactor-team/semantic/releases/tag/v0.1.2
 [0.1.1]: https://github.com/reactor-team/semantic/releases/tag/v0.1.1

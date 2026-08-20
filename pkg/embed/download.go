@@ -15,14 +15,14 @@ import (
 	"time"
 )
 
-// OrtVersion is the ONNX Runtime release whose C API onnxruntime_go v1.31.0
+// OrtVersion is the ONNX Runtime release whose C API onnxruntime_go v1.33.0
 // is built against. The two are coupled: the binding compiles against one
 // version of the headers and dlopens whatever this constant downloaded, so
 // bumping the Go module without bumping this constant produces a binary that
 // loads a library it was not compiled for. Nothing in CI catches that — the
 // tests skip inference when no model is installed — so the versions move
 // together, in one commit, or not at all.
-const OrtVersion = "1.26.0"
+const OrtVersion = "1.29.0"
 
 // OrtDownloadURL returns the GitHub release URL for the ORT shared library
 // archive for the current platform.

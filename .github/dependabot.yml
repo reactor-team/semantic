@@ -10,6 +10,11 @@ updates:
     schedule:
       interval: weekly
     groups:
+      # onnxruntime_go in this group is version-coupled to the OrtVersion
+      # constant in pkg/embed/download.go (see the comment there): a bump here
+      # with no matching OrtVersion bump ships a binary that requests an ORT
+      # API version the downloaded library doesn't support, and nothing in CI
+      # catches it. Check the diff for onnxruntime_go before merging this group.
       go-dependencies:
         patterns: ["*"]
     open-pull-requests-limit: 3

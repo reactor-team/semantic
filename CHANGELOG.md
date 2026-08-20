@@ -16,6 +16,20 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-08-19
+
+### Fixed
+
+- **The ONNX Runtime and its Go binding drifted out of pair again.** A grouped
+  dependency bump took `onnxruntime_go` to v1.33.0 (`ORT_API_VERSION` 29)
+  without a matching `OrtVersion` bump, so `semantic init` fetched the 1.26.0
+  runtime and every embed failed with "the requested API version [29] is not
+  available, only API versions [1, 26] are supported in this build."
+  `OrtVersion` is now 1.29.0, matching what the binding actually requires — the
+  same failure mode as 0.1.1, this time from an unreviewed dependency bump
+  rather than a hand-edited mismatch. The dependabot config now flags the
+  coupling next to the group that broke it.
+
 ## [0.2.0] — 2026-08-19
 
 ### Fixed
@@ -263,7 +277,8 @@ Initial public release.
   build-provenance attestation. The archives carry the binary only; `semantic
   init` fetches the model and runtime on first use.
 
-[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/reactor-team/semantic/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/reactor-team/semantic/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/reactor-team/semantic/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/reactor-team/semantic/releases/tag/v0.1.2

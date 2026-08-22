@@ -92,8 +92,8 @@ github.com/tree-sitter/tree-sitter-scala v0.26.2 h1:ue3zsxnZzKvCAlBqOxIecqgI+NZj
 github.com/tree-sitter/tree-sitter-scala v0.26.2/go.mod h1:BmDV0f9rgsnGuG9QtKXQZnqJvECyR9fM8wVg984ulBo=
 github.com/tree-sitter/tree-sitter-typescript v0.23.2 h1:/Odvphn18PniVixb9e97X0DbNVsU6Qocv9mfkyzdXwU=
 github.com/tree-sitter/tree-sitter-typescript v0.23.2/go.mod h1:zjzMXT/Ulffel2xfOcAkQQkiAkmgnbtPGlFQw/5X4xA=
-github.com/yalue/onnxruntime_go v1.33.0 h1:QP+hMVtjC/PTEoCcJ+od8HfvHf2Yabpp96bifrhP0Sk=
-github.com/yalue/onnxruntime_go v1.33.0/go.mod h1:b4X26A8pekNb1ACJ58wAXgNKeUCGEAQ9dmACut9Sm/4=
+github.com/yalue/onnxruntime_go v1.34.0 h1:rXioKtIj4N6lRezHSG0nHu7WAHSbO0JtSAqB+zjbsCw=
+github.com/yalue/onnxruntime_go v1.34.0/go.mod h1:b4X26A8pekNb1ACJ58wAXgNKeUCGEAQ9dmACut9Sm/4=
 github.com/yuin/goldmark v1.8.5 h1:r6N5afV5qj/5S4UTch8agZHJ8UxNCMwX7WjkkJam2NA=
 github.com/yuin/goldmark v1.8.5/go.mod h1:ip/1k0VRfGynBgxOz0yCqHrbZXhcjxyuS66Brc7iBKg=
 go.yaml.in/yaml/v3 v3.0.5 h1:N6y/pJk8buWs9NY5ERU2HSMfm+IuD/OtfdAnq6kESPw=

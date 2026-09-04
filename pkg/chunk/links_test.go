@@ -16,7 +16,7 @@ func TestLinks_ExtractsAndFilters(t *testing.T) {
 		"\n" +
 		"Transclusion ![[Embedded#heading|alias]].\n"
 
-	got := Links(content)
+	got := Links("note.md", content)
 
 	type key struct {
 		target string
@@ -74,7 +74,7 @@ func TestLinks_Anchors(t *testing.T) {
 		target, anchor, kind string
 	}
 	got := map[ta]bool{}
-	for _, l := range Links(content) {
+	for _, l := range Links("note.md", content) {
 		got[ta{l.Target, l.Anchor, l.Kind}] = true
 	}
 
@@ -99,7 +99,7 @@ func TestLinks_BareExtensionIsNotAPath(t *testing.T) {
 	content := "# T\n\nHandles `.go` and `.md`, but `main.go` and `.hidden.md` are files.\n"
 
 	var code []string
-	for _, l := range Links(content) {
+	for _, l := range Links("note.md", content) {
 		if l.Kind == LinkCode {
 			code = append(code, l.Target)
 		}
@@ -120,7 +120,7 @@ func TestLinks_BareExtensionIsNotAPath(t *testing.T) {
 func TestLinks_FrontmatterLineOffset(t *testing.T) {
 	t.Parallel()
 	content := "---\ntitle: T\ntags: [a]\n---\n\nBody links [x](y.md).\n"
-	got := Links(content)
+	got := Links("note.md", content)
 	if len(got) != 1 {
 		t.Fatalf("want 1 link, got %d: %v", len(got), got)
 	}
@@ -142,7 +142,7 @@ func TestLinks_CodePaths(t *testing.T) {
 		"```\n" // 8
 
 	seen := map[string]int{} // code target → line
-	for _, l := range Links(content) {
+	for _, l := range Links("note.md", content) {
 		if l.Kind == LinkCode {
 			seen[l.Target] = l.Line
 		}
@@ -170,7 +170,7 @@ func TestLinks_CodePaths_GoSource(t *testing.T) {
 		"See `internal/graph/graph.go` for the resolver.\n" // 3
 
 	seen := map[string]int{}
-	for _, l := range Links(content) {
+	for _, l := range Links("note.md", content) {
 		if l.Kind == LinkCode {
 			seen[l.Target] = l.Line
 		}
@@ -188,7 +188,7 @@ func TestLinks_CodePaths_NotInsideRealLink(t *testing.T) {
 	t.Parallel()
 	content := "See [`internal/graph/graph.go`](/internal/graph/graph.go) for the resolver.\n"
 
-	links := Links(content)
+	links := Links("note.md", content)
 	for _, l := range links {
 		if l.Kind == LinkCode {
 			t.Errorf("code span inside a real link's label should not also be a LinkCode ref; got %+v", l)
@@ -215,7 +215,7 @@ func TestLinks_WikilinkInsideCodeSpanIsNotAnEdge(t *testing.T) {
 		"A real one is [[actual-note]] here.\n"
 
 	var wiki []string
-	for _, l := range Links(content) {
+	for _, l := range Links("note.md", content) {
 		if l.Kind == LinkWiki {
 			wiki = append(wiki, l.Target)
 		}
@@ -232,7 +232,7 @@ func TestLinks_WikilinkInsideFencedBlockIsNotAnEdge(t *testing.T) {
 	content := "Example:\n\n```\n[[not-an-edge]]\n```\n\nBut [[real-note]] is one.\n"
 
 	var wiki []string
-	for _, l := range Links(content) {
+	for _, l := range Links("note.md", content) {
 		if l.Kind == LinkWiki {
 			wiki = append(wiki, l.Target)
 		}
@@ -255,7 +255,7 @@ func TestLinks_IgnoreDirectives(t *testing.T) {
 		"Angled `pkg/<lang>.go`. <!-- semantic-ignore: <lang> is a placeholder -->\n" // 7 — suppressed
 
 	seen := map[string]bool{}
-	for _, l := range Links(content) {
+	for _, l := range Links("note.md", content) {
 		seen[l.Target] = true
 	}
 
@@ -274,14 +274,213 @@ func TestLinks_IgnoreDirectives(t *testing.T) {
 func TestLinks_IgnoreFile(t *testing.T) {
 	t.Parallel()
 	content := "<!-- semantic-ignore-file -->\n\nAll [a](a.md) and `b/c.md` gone.\n"
-	if got := Links(content); got != nil {
+	if got := Links("note.md", content); got != nil {
 		t.Errorf("semantic-ignore-file should suppress everything; got %v", got)
 	}
 }
 
 func TestLinks_None(t *testing.T) {
 	t.Parallel()
-	if got := Links("# Just a heading\n\nProse with no links.\n"); got != nil {
+	if got := Links("note.md", "# Just a heading\n\nProse with no links.\n"); got != nil {
 		t.Errorf("want nil, got %v", got)
+	}
+}
+
+// The JSX-href and MDX-comment cases below pin the two ways an .mdx file
+// differs from a .md one at extraction time. Both are gated on the extension,
+// so each has a .md counterpart asserting the old behaviour is untouched.
+
+func TestLinks_ExtractsJSXHrefsInMDX(t *testing.T) {
+	t.Parallel()
+	content := "# Title\n" + // line 1
+		"\n" + // line 2
+		"<Card title=\"Deploy\" href=\"/deploy/overview\" />\n" + // line 3
+		"<Card title=\"Quoted\" href='/deploy/quickstart' />\n" + // line 4
+		"<Card title=\"External\" href=\"https://example.com\" />\n" + // line 5
+		"<Card title=\"Anchor\" href=\"#top\" />\n" + // line 6
+		"\n" +
+		"```jsx\n" + // fenced: an example must not yield an edge
+		"<Card href=\"/not/an/edge\" />\n" +
+		"```\n" +
+		"\n" +
+		"Inline `<Card href=\"/also/not/an/edge\" />` in prose.\n" // line 12
+
+	seen := map[string]int{} // target → line
+	for _, l := range Links("page.mdx", content) {
+		if l.Kind == LinkMarkdown {
+			seen[l.Target] = l.Line
+		}
+	}
+
+	for _, tc := range []struct {
+		target string
+		line   int
+	}{
+		{"/deploy/overview", 3},
+		{"/deploy/quickstart", 4},
+	} {
+		if got, ok := seen[tc.target]; !ok {
+			t.Errorf("href %q not extracted; got %v", tc.target, seen)
+		} else if got != tc.line {
+			t.Errorf("href %q on line %d, want %d", tc.target, got, tc.line)
+		}
+	}
+
+	for _, gone := range []string{"https://example.com", "#top", "/not/an/edge", "/also/not/an/edge"} {
+		if _, ok := seen[gone]; ok {
+			t.Errorf("href %q should not be an edge; got %v", gone, seen)
+		}
+	}
+}
+
+// An href written as a JSX expression is the same link in JSX's other syntax,
+// so `{"/x"}` is an edge. An expression that computes a path at render time is
+// not: emitting the literal inside it would name a target no page has, which
+// reads as a broken link rather than as an expression nothing can resolve.
+func TestLinks_ExtractsJSXHrefExpressionForms(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		attr string
+		want string // "" = no edge
+	}{
+		{"double-quoted attribute", `href="/a/one"`, "/a/one"},
+		{"single-quoted attribute", `href='/a/two'`, "/a/two"},
+		{"space around equals", `href = "/a/three"`, "/a/three"},
+		{"braced double quotes", `href={"/a/four"}`, "/a/four"},
+		{"braced single quotes", `href={'/a/five'}`, "/a/five"},
+		{"braced template literal", "href={`/a/six`}", "/a/six"},
+		{"braced with inner spaces", "href={ `/a/seven` }", "/a/seven"},
+		{"plain HTML anchor", `href="/a/eight"`, "/a/eight"},
+
+		{"concatenation names a fragment", `href={base + "/a/nine"}`, ""},
+		{"interpolation is render-time", "href={`/a/${id}`}", ""},
+		{"bare identifier", `href={url}`, ""},
+		{"absolute URL", `href={"https://example.com/x"}`, ""},
+		{"empty", `href={""}`, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var got []string
+			for _, l := range Links("page.mdx", "<Card "+tc.attr+" />\n") {
+				got = append(got, l.Target)
+			}
+			if tc.want == "" {
+				if len(got) != 0 {
+					t.Errorf("%s: want no edge, got %v", tc.attr, got)
+				}
+				return
+			}
+			if len(got) != 1 || got[0] != tc.want {
+				t.Errorf("%s: want [%s], got %v", tc.attr, tc.want, got)
+			}
+		})
+	}
+}
+
+func TestLinks_IgnoresJSXHrefsInPlainMarkdown(t *testing.T) {
+	t.Parallel()
+	// The same content in a .md file yields nothing: an HTML <a href> in
+	// ordinary markdown was never an edge, and .md behaviour must not move.
+	content := "# Title\n\n<a href=\"/deploy/overview\">Deploy</a>\n"
+	for _, l := range Links("note.md", content) {
+		if l.Target == "/deploy/overview" {
+			t.Errorf("href extracted from a .md file: %+v", l)
+		}
+	}
+}
+
+func TestLinks_MDXCommentSuppresses(t *testing.T) {
+	t.Parallel()
+	// MDX has no HTML comments, so {/* */} is the only escape hatch there.
+	content := "# Title\n" +
+		"\n" +
+		"A `placeholder.mdx` reference. {/* semantic-ignore: prose placeholder */}\n" + // line 3
+		"{/* semantic-ignore-next-line */}\n" + // line 4
+		"Another `next-line.mdx` reference.\n" + // line 5
+		"A live `real.mdx` reference.\n" // line 6
+
+	var targets []string
+	for _, l := range Links("page.mdx", content) {
+		targets = append(targets, l.Target)
+	}
+
+	if len(targets) != 1 || targets[0] != "real.mdx" {
+		t.Errorf("MDX ignore directives not honored: got %v, want [real.mdx]", targets)
+	}
+}
+
+func TestLinks_BothCommentSyntaxesSuppress(t *testing.T) {
+	t.Parallel()
+	// Accepting both forms everywhere is deliberate: a directive must never
+	// silently do nothing because it was written in the other flavour's syntax.
+	for _, tc := range []struct {
+		name      string
+		file      string
+		directive string
+	}{
+		{"html form in md", "note.md", "<!-- semantic-ignore -->"},
+		{"mdx form in md", "note.md", "{/* semantic-ignore */}"},
+		{"html form in mdx", "page.mdx", "<!-- semantic-ignore -->"},
+		{"mdx form in mdx", "page.mdx", "{/* semantic-ignore */}"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			content := "# Title\n\nA `suppressed.md` reference. " + tc.directive + "\n"
+			if got := Links(tc.file, content); len(got) != 0 {
+				t.Errorf("directive %q did not suppress: got %+v", tc.directive, got)
+			}
+		})
+	}
+}
+
+func TestIgnoresFile_BothCommentSyntaxes(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		content string
+		want    bool
+	}{
+		{"html form", "<!-- semantic-ignore-file -->\n\n# Title\n", true},
+		{"mdx form", "{/* semantic-ignore-file */}\n\n# Title\n", true},
+		{"mdx form with reason", "{/* semantic-ignore-file: generated */}\n\n# Title\n", true},
+		{"line-scoped directive is not file-scoped", "{/* semantic-ignore */}\n\n# Title\n", false},
+		{"no directive", "# Title\n", false},
+		{"inside a fence does not count", "```\n{/* semantic-ignore-file */}\n```\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := IgnoresFile(tc.content); got != tc.want {
+				t.Errorf("IgnoresFile() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsMarkdownAndIsMDX(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		path       string
+		isMarkdown bool
+		isMDX      bool
+	}{
+		{"a.md", true, false},
+		{"a.markdown", true, false},
+		{"a.mdx", true, true},
+		{"a.MDX", true, true},
+		{"dir/b.mdx", true, true},
+		{"a.go", false, false},
+		{"a.txt", false, false},
+		{"mdx", false, false},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			t.Parallel()
+			if got := IsMarkdown(tc.path); got != tc.isMarkdown {
+				t.Errorf("IsMarkdown(%q) = %v, want %v", tc.path, got, tc.isMarkdown)
+			}
+			if got := IsMDX(tc.path); got != tc.isMDX {
+				t.Errorf("IsMDX(%q) = %v, want %v", tc.path, got, tc.isMDX)
+			}
+		})
 	}
 }

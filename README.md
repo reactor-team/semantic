@@ -56,7 +56,7 @@ a body is implementation, and embedding it dilutes what the symbol is for.
 
 | Language | Extensions | Chunked as |
 |---|---|---|
-| Markdown | `.md` `.markdown` | Heading tree |
+| Markdown | `.md` `.markdown` `.mdx` | Heading tree |
 | Go | `.go` | package · type · func · method · documented const/var |
 | Python | `.py` `.pyi` | module · class · method · func · documented constant |
 | TypeScript | `.ts` `.mts` `.cts` `.tsx` | file doc · func · class · interface · type · enum · const |
@@ -174,7 +174,7 @@ selects it in both the report and `--fix`.
 | `--ambiguous` | A bare basename with no directory (`` `service.go` ``) matching more than one indexed file. | Needs a human |
 | `--broken` | A dead path, or a dead `#section` anchor. | Needs a human |
 | `--deep` | A real `[text](path)` link climbing two or more directories with `../../`. | Rewritten root-absolute |
-| `--toc` | A markdown file over 100 lines whose `## Contents` table is absent or out of date. | Regenerated |
+| `--toc` | A markdown file over 100 lines whose `## Contents` table is absent or out of date. `.mdx` is exempt. | Regenerated |
 
 The first three are inline-code references, and they group together because
 such a reference never becomes a graph edge — a file referenced only that way
@@ -189,7 +189,18 @@ a monorepo, or a `docs/` sub-tree — gets the right prefix
 (`/subproj/docs/x.md`). With no repository it stays vault-relative. <!-- semantic-ignore: illustrative example path -->
 
 A Contents table earns its keep on a long file because a partial read then still
-reveals the file's full scope.
+reveals the file's full scope. An `.mdx` page is exempt: it is a page on a docs
+site that renders its own table of contents from the headings, so a written one
+is a duplicate the reader sees twice.
+
+`.mdx` differs from plain markdown in two further ways, both because a page
+addresses its neighbours the way the rendered site does. A JSX `href` — the
+`<Card href="/deploy/quickstart" />` a docs site writes its navigation with, in
+either the attribute or the `href={"/x"}` expression form — is a graph edge, so
+a page reached only through one is not an orphan; and a bare
+target with no extension resolves against `.mdx` as well, so `/deploy/overview`
+finds `deploy/overview.mdx`. MDX has no HTML comments, so the suppression <!-- semantic-ignore: illustrative example path -->
+directives below are also accepted in its `{/* … */}` form.
 
 #### Fixing and suppressing
 
@@ -207,7 +218,8 @@ vault.
 
 False positives suppress ESLint-style: `<!-- semantic-ignore -->` on the
 offending line, `-next-line` on the line above, or `-file` at the top to exempt
-a whole file. The last is what a vendored or verbatim third-party document
+a whole file. In `.mdx`, write the same directive as `{/* semantic-ignore */}`,
+since MDX has no HTML comments. The last is what a vendored or verbatim third-party document
 wants, since it silences the TOC check too.
 
 ## Configuration

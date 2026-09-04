@@ -26,9 +26,16 @@ type Language struct {
 // grammar, a superset that also parses ordinary JS. Header files go to the C++
 // chunker, whose grammar is a superset of C's — a `.h` is as likely to be C++
 // as C, and misreading a class as a syntax error loses more than the reverse.
+// MDX is markdown with JSX components spliced in. It shares the markdown
+// language name and chunker rather than earning its own: goldmark reads an
+// unknown tag as an HTML block, so the prose and headings around a component
+// still chunk correctly, and one `--lang markdown` filter covers both
+// flavours. The places the two genuinely differ — a TOC the site renders
+// itself, comment syntax, links written as JSX attributes — key off IsMDX.
 var byExtension = map[string]Language{
 	".md":       {"markdown", Document},
 	".markdown": {"markdown", Document},
+	".mdx":      {"markdown", Document},
 	".go":       {"go", GoSource},
 	".ts":       {"typescript", TypeScript},
 	".mts":      {"typescript", TypeScript},

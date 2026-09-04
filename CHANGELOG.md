@@ -16,6 +16,47 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-04
+
+MDX support: a documentation site written in `.mdx` now indexes, searches, and
+links like any other markdown tree. The link-extractor bump re-parses edges on
+the first run, which is seconds; nothing is re-embedded.
+
+### Added
+
+- **[reindex]** **`.mdx` files are indexed as markdown.** A documentation site
+  built with MDX was invisible: `.mdx` was in no chunker's extension table, so
+  the pages did not index, did not search, and had no place in the link graph.
+  They now chunk by heading tree exactly as `.md` does, and the three places a
+  page addresses its neighbours the way the rendered site does are handled:
+
+  - A bare link target resolves against `.mdx` too, so `/deploy/overview` finds
+    `deploy/overview.mdx`. Without this, every root-absolute link on such a site
+    reads as broken.
+  - A JSX `href` is a graph edge — the `<Card href="/deploy/quickstart" />` a
+    docs site writes its navigation with. Unknown JSX reaches the markdown
+    parser as a raw block rather than a node, so these are recovered by scanning
+    the source outside code spans, the way `[[wikilinks]]` already are. Without
+    this, a page reached only through navigation reads as an orphan. The
+    expression form counts too (`href={"/x"}`), but only when the braces hold
+    one whole literal: `{base + "/x"}` names a fragment of a path built at
+    render time, and emitting it would report a broken link to a target no page
+    has.
+  - `{/* semantic-ignore */}` suppresses a finding, in each of the three forms
+    the HTML-comment directive takes. MDX has no HTML comments, so on an `.mdx`
+    page the existing escape hatch could not be written at all.
+
+  The `## Contents` audit skips `.mdx`. A docs site renders its own table of
+  contents from the headings, so a written one is a duplicate the reader sees
+  twice — and `lint --fix` would have injected one into every long page.
+
+### Changed
+
+- **`chunk.Links` now takes the file's name alongside its content.** Link
+  extraction is no longer the same for every markdown file, so it needs to know
+  which flavour it is reading. A breaking signature change to an exported
+  function, which 0.x permits.
+
 ## [0.2.1] — 2026-08-19
 
 ### Fixed
@@ -277,7 +318,8 @@ Initial public release.
   build-provenance attestation. The archives carry the binary only; `semantic
   init` fetches the model and runtime on first use.
 
-[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/reactor-team/semantic/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/reactor-team/semantic/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/reactor-team/semantic/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/reactor-team/semantic/compare/v0.1.2...v0.1.3

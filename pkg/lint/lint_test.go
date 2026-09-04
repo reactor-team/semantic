@@ -385,6 +385,10 @@ func TestAuditTOCs(t *testing.T) {
 		"short.md":        "# Short\n\n## A\n\ntext\n",         // under threshold → skipped
 		"no-headings.md":  strings.Repeat("prose line\n", 150), // long but nothing to tabulate → skipped
 		"notes.txt":       long(false),                         // not markdown → skipped
+		// A docs site renders its own page TOC, so a long .mdx page is out of
+		// scope however many headings it has. Without this, --fix writes a
+		// duplicate Contents block into every long page on such a site.
+		"long-page.mdx": long(false),
 		// A verbatim third-party document opts out of restructuring entirely.
 		"vendored.md": "<!-- semantic-ignore-file -->\n" + long(false),
 		// The same directive shown as an example can't suppress its own file.
@@ -392,7 +396,7 @@ func TestAuditTOCs(t *testing.T) {
 	}
 	read := func(rel string) (string, error) { return content[rel], nil }
 
-	files := []string{"long-missing.md", "long-current.md", "short.md", "no-headings.md", "notes.txt", "vendored.md", "documents-it.md"}
+	files := []string{"long-missing.md", "long-current.md", "short.md", "no-headings.md", "notes.txt", "long-page.mdx", "vendored.md", "documents-it.md"}
 	got, err := AuditTOCs(files, read)
 	if err != nil {
 		t.Fatal(err)

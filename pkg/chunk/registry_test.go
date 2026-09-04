@@ -10,6 +10,7 @@ func TestLanguageFor(t *testing.T) {
 	cases := map[string]string{
 		"pkg/x.go":           "go",
 		"README.md":          "markdown",
+		"docs/page.mdx":      "markdown", // MDX shares the markdown language name
 		"web/app.tsx":        "typescript",
 		"web/app.js":         "javascript",
 		"api/run.py":         "python",

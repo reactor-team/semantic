@@ -344,3 +344,50 @@ func TestGraph_Stats(t *testing.T) {
 		t.Errorf("orphans=%d, want 1", s.Orphans)
 	}
 }
+
+// A docs site addresses its pages by URL path with no extension, so nearly
+// every internal link on one arrives here bare and must find the .mdx file.
+// This is the case that decides whether such a site's link graph resolves at
+// all or reports as entirely broken.
+func TestBuild_ResolvesExtensionlessLinksToMDX(t *testing.T) {
+	t.Parallel()
+	src := &fakeSource{
+		files: []string{"deploy/overview.mdx", "deploy/quickstart.mdx", "concepts/sessions.mdx", "guide.md"},
+		links: []index.LinkRow{
+			md("deploy/overview.mdx", "/deploy/quickstart", chunk.LinkMarkdown),     // root-absolute, bare
+			md("deploy/overview.mdx", "/concepts/sessions", chunk.LinkMarkdown),     // across sections
+			md("deploy/overview.mdx", "quickstart", chunk.LinkMarkdown),             // sibling, bare
+			md("deploy/overview.mdx", "/deploy/ghost", chunk.LinkMarkdown),          // broken
+			md("guide.md", "/deploy/overview", chunk.LinkMarkdown),                  // .md → .mdx
+			md("deploy/overview.mdx", "/deploy/quickstart.mdx", chunk.LinkMarkdown), // explicit extension
+		},
+	}
+	g, err := Build(src, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resolved := map[string]string{}
+	for _, e := range g.Edges {
+		resolved[e.From+"|"+e.Raw] = e.To
+	}
+	cases := map[string]string{
+		"deploy/overview.mdx|/deploy/quickstart":     "deploy/quickstart.mdx",
+		"deploy/overview.mdx|/concepts/sessions":     "concepts/sessions.mdx",
+		"deploy/overview.mdx|quickstart":             "deploy/quickstart.mdx",
+		"deploy/overview.mdx|/deploy/ghost":          "",
+		"guide.md|/deploy/overview":                  "deploy/overview.mdx",
+		"deploy/overview.mdx|/deploy/quickstart.mdx": "deploy/quickstart.mdx",
+	}
+	for k, want := range cases {
+		if got := resolved[k]; got != want {
+			t.Errorf("edge %q resolved to %q, want %q", k, got, want)
+		}
+	}
+
+	// The one genuinely dead link is the only thing Broken() should report.
+	broken := g.Broken()
+	if len(broken) != 1 || broken[0].Raw != "/deploy/ghost" {
+		t.Errorf("Broken() = %+v, want only /deploy/ghost", broken)
+	}
+}

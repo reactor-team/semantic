@@ -193,8 +193,8 @@ func chunkerFor(name string) chunk.Chunker {
 // through links.
 func extractLinks(name, content string) []chunk.Link {
 	switch strings.ToLower(filepath.Ext(name)) {
-	case ".md", ".markdown":
-		return chunk.Links(content)
+	case ".md", ".markdown", ".mdx":
+		return chunk.Links(name, content)
 	}
 	return nil
 }

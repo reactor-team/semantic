@@ -1,0 +1,67 @@
+# MDX end to end, on a vault shaped like a real docs site: pages addressed by
+# URL path with no extension, and navigation written as JSX components rather
+# than prose links.
+#
+# Both contracts here fail silently rather than loudly if they regress — a
+# site's links all read as broken, or the pages it navigates to all read as
+# orphans — so they are pinned end to end. The .mdx exclusion from the Contents
+# audit is a unit test instead (pkg/lint): tripping it needs two files over a
+# 100-line threshold, which is filler this script does not need.
+
+env SEMANTIC_CACHE_DIR=$WORK/cache
+
+# lint is the vehicle that populates the index without embedding, the same
+# pairing graph.txtar uses. It is clean here because its own broken-reference
+# audit covers inline-code paths, not markdown links — the dead link below is
+# the graph's finding, not lint's.
+semantic lint
+stdout 'no lint issues flagged'
+
+# Every .mdx page is indexed, and counted as markdown rather than as some
+# separate file type.
+semantic graph --no-reindex
+stdout '^files:    4 \(4 markdown\)$'
+
+# The one dead link is the only breakage. If a bare target did not try the
+# .mdx extension, every link in this vault would be listed here instead.
+semantic graph --broken --no-reindex
+stdout '^deploy/overview\.mdx:10\t/deploy/ghost\t\(md\)$'
+! stdout '/deploy/quickstart'
+! stdout '/concepts/sessions'
+
+# quickstart.mdx is reached ONLY through a JSX <Card href>, so its absence here
+# proves the href is a real edge. unlinked.mdx has no inbound link by design
+# and keeps this from passing merely because orphan reporting went quiet.
+semantic graph --orphans --no-reindex
+! stdout 'quickstart\.mdx'
+stdout '^concepts/unlinked\.mdx$'
+
+-- deploy/overview.mdx --
+---
+title: Overview
+description: The deploy section
+---
+
+Read about [sessions](/concepts/sessions) first.
+
+<Card title="Quickstart" href="/deploy/quickstart" />
+
+This one is dead: [ghost](/deploy/ghost).
+-- deploy/quickstart.mdx --
+---
+title: Quickstart
+---
+
+Back to the [overview](/deploy/overview).
+-- concepts/sessions.mdx --
+---
+title: Sessions
+---
+
+A session is the unit of connection.
+-- concepts/unlinked.mdx --
+---
+title: Unlinked
+---
+
+Nothing points at this page.

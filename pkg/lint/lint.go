@@ -323,13 +323,17 @@ type TOCFinding struct {
 
 // AuditTOCs flags long markdown files lacking a current Contents TOC. A file is
 // in scope when it is markdown, exceeds toc.LineThreshold lines, has at least
-// one heading a TOC would list, and does not opt out with
-// `<!-- semantic-ignore-file -->`; read supplies file content by rel-path.
+// one heading a TOC would list, and does not opt out with a
+// `semantic-ignore-file` directive; read supplies file content by rel-path.
+//
+// MDX is out of scope. A docs site renders its own page TOC from the headings,
+// so a `## Contents` block there is a duplicate the reader sees twice — and
+// --fix would write one into every long page.
 // A file whose content can't be read is skipped rather than failing the audit.
 func AuditTOCs(files []string, read func(string) (string, error)) ([]TOCFinding, error) {
 	var out []TOCFinding
 	for _, f := range files {
-		if !chunk.IsMarkdown(f) {
+		if !chunk.IsMarkdown(f) || chunk.IsMDX(f) {
 			continue
 		}
 		content, err := read(f)

@@ -373,13 +373,21 @@ func IsContentsHeading(s string) bool {
 }
 
 // IsMarkdown reports whether a path is a markdown file by extension
-// (.md/.markdown, case-insensitive).
+// (.md/.markdown/.mdx, case-insensitive). MDX counts: it chunks, searches, and
+// links as markdown — see byExtension.
 func IsMarkdown(p string) bool {
 	switch strings.ToLower(path.Ext(p)) {
-	case ".md", ".markdown":
+	case ".md", ".markdown", ".mdx":
 		return true
 	}
 	return false
+}
+
+// IsMDX reports whether a path is specifically MDX. Callers use it for the
+// handful of behaviours where the JSX flavour differs from plain markdown, so
+// each difference is one explicit check rather than a second file-type concept.
+func IsMDX(p string) bool {
+	return strings.ToLower(path.Ext(p)) == ".mdx"
 }
 
 // slugifyHeading turns heading text into a chunk-key suffix: lowercase,

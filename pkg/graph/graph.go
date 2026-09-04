@@ -361,12 +361,14 @@ func (r *Resolver) Candidates(target string) []string {
 }
 
 // extCandidates returns the path plus markdown-extension variants when it has
-// none, so [x](foo) and [x](foo.md) both resolve to foo.md.
+// none, so [x](foo) and [x](foo.md) both resolve to foo.md. The .mdx variant is
+// what makes a docs-site link resolve: MDX pages are addressed by URL path with
+// no extension, so nearly every internal link on such a site arrives here bare.
 func extCandidates(p string) []string {
 	if path.Ext(p) != "" {
 		return []string{p}
 	}
-	return []string{p, p + ".md", p + ".markdown"}
+	return []string{p, p + ".md", p + ".markdown", p + ".mdx"}
 }
 
 func baseNoExt(p string) string {

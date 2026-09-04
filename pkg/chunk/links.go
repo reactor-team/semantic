@@ -45,14 +45,39 @@ var wikilinkPattern = regexp.MustCompile(`\[\[([^\[\]]+)\]\]`)
 // to drop links that point outside the vault.
 var urlSchemePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
 
-// ignorePattern matches an ESLint-style suppression directive written as an
-// HTML comment: `<!-- semantic-ignore -->` drops references on the same line,
-// `-next-line` the following line, `-file` the whole file. An optional trailing
-// reason (`<!-- semantic-ignore: template placeholder -->`) is allowed. The
-// reason runs to the first `-->` rather than the first `>`, so it can name the
-// very thing being suppressed (`<lang>`, `Foo<T>`) without silently voiding the
-// directive.
-var ignorePattern = regexp.MustCompile(`<!--\s*semantic-ignore(-next-line|-file)?\b.*?-->`)
+// jsxHrefPattern matches the href of a JSX element (`<Card href="/x" />`).
+// Docs sites written in MDX put a large share of their navigation in
+// components rather than in prose links, and goldmark has no node for one —
+// an unknown tag arrives as raw HTML — so these are found by scanning the
+// source, exactly as wikilinks are. A non-participating group is -1 in the
+// match, so the caller takes whichever matched.
+//
+// A braced expression counts only when it holds one whole literal and nothing
+// else: `{"/x"}` is the same link written in JSX's expression form, whereas
+// `{base + "/x"}` and “ {`/x/${id}`} “ name a fragment of a path computed at
+// render time. Matching those would emit a target no page has, which reads as
+// a broken link rather than as the unresolvable expression it is — so the
+// template form excludes `$` and `{`, and the closing brace must follow the
+// literal directly.
+var jsxHrefPattern = regexp.MustCompile(
+	`href\s*=\s*(?:` +
+		`"([^"]*)"|'([^']*)'` + // attribute form
+		"|\\{\\s*(?:\"([^\"]*)\"|'([^']*)'|`([^`${]*)`)\\s*\\}" + // expression form
+		`)`)
+
+// ignorePattern matches an ESLint-style suppression directive in either comment
+// syntax: `semantic-ignore` drops references on the same line, `-next-line` the
+// following line, `-file` the whole file. An optional trailing reason
+// (`<!-- semantic-ignore: template placeholder -->`) is allowed, and runs to
+// the closing delimiter rather than the first `>`, so it can name the very thing
+// being suppressed (`<lang>`, `Foo<T>`) without silently voiding the directive.
+//
+// Both forms are accepted for every file type rather than gated on IsMDX. MDX
+// has no HTML comments, so the `<!-- -->` form cannot suppress anything in an
+// .mdx file and the `{/* */}` form is the only escape hatch there; accepting
+// both everywhere costs nothing and means a directive never silently does
+// nothing because it was written in the other flavour's syntax.
+var ignorePattern = regexp.MustCompile(`(?:<!--\s*semantic-ignore(-next-line|-file)?\b.*?-->)|(?:\{/\*\s*semantic-ignore(-next-line|-file)?\b.*?\*/\})`)
 
 // Links extracts outbound document references from markdown content. Inline
 // `[text](dest)` links come from the goldmark AST, so links written inside
@@ -61,10 +86,15 @@ var ignorePattern = regexp.MustCompile(`<!--\s*semantic-ignore(-next-line|-file)
 // blocks. Inline-code spans that look like doc or source-code paths
 // (`docs/foo.md`, `internal/foo/bar.go`) are also emitted as LinkCode — not
 // edges, but candidates the lint layer surfaces.
+// In an MDX file, a JSX element's href (`<Card href="/x" />`) is also emitted,
+// as an ordinary LinkMarkdown edge — it is a link, just written as an
+// attribute. name selects that behaviour by extension; a plain .md file yields
+// exactly the edges it did before, so an HTML `<a href>` in one is still left
+// alone.
 // Frontmatter is stripped first so line numbers map to the file. A
-// `<!-- semantic-ignore -->` directive suppresses references on its line (see
+// `semantic-ignore` directive suppresses references on its line (see
 // applyIgnores).
-func Links(content string) []Link {
+func Links(name, content string) []Link {
 	_, body := splitFrontmatter(content)
 	baseLine := strings.Count(content[:len(content)-len(body)], "\n")
 
@@ -133,14 +163,47 @@ func Links(content string) []Link {
 			out = append(out, Link{Target: tgt, Anchor: anchor, Kind: LinkWiki, Line: lineOf(m[0])})
 		}
 	}
+	// JSX hrefs, MDX only, and excluded by offset from both kinds of code for
+	// the same reason wikilinks are: a page documenting the syntax must not
+	// yield an edge to whatever its example points at.
+	if IsMDX(name) {
+		for _, m := range jsxHrefPattern.FindAllSubmatchIndex(source, -1) {
+			if offsetInRanges(m[0], codeRanges) || offsetInRanges(m[0], spanRanges) {
+				continue
+			}
+			dest, ok := submatch(source, m, 1, 2, 3, 4, 5)
+			if !ok {
+				continue
+			}
+			if tgt, anchor, ok := internalTarget(dest); ok {
+				out = append(out, Link{Target: tgt, Anchor: anchor, Kind: LinkMarkdown, Line: lineOf(m[0])})
+			}
+		}
+	}
+
 	return applyIgnores(out, source, codeRanges, lineOf)
 }
 
+// submatch returns the text of the first participating group among groups, for
+// a pattern whose alternatives each capture the same value in a group of their
+// own — the two quote styles of a JSX href, the two comment syntaxes of an
+// ignore directive. Reports false when none of them matched, which for an
+// optional group is itself the answer rather than an error.
+func submatch(source []byte, m []int, groups ...int) (string, bool) {
+	for _, g := range groups {
+		if lo, hi := m[2*g], m[2*g+1]; lo >= 0 {
+			return string(source[lo:hi]), true
+		}
+	}
+	return "", false
+}
+
 // IgnoresFile reports whether markdown content opts out of linting entirely
-// with `<!-- semantic-ignore-file -->`. Checks that read whole files rather
-// than references — the Contents TOC audit — consult this so a file-level
-// directive means what it says. A directive inside a code block doesn't count,
-// so documenting the syntax can't suppress the file that documents it.
+// with a `semantic-ignore-file` directive, in either comment syntax. Checks
+// that read whole files rather than references — the Contents TOC audit —
+// consult this so a file-level directive means what it says. A directive
+// inside a code block doesn't count, so documenting the syntax can't suppress
+// the file that documents it.
 func IgnoresFile(content string) bool {
 	_, body := splitFrontmatter(content)
 	source := []byte(strings.TrimSpace(body))
@@ -165,7 +228,7 @@ func IgnoresFile(content string) bool {
 		if offsetInRanges(m[0], codeRanges) {
 			continue
 		}
-		if m[2] >= 0 && string(source[m[2]:m[3]]) == "-file" {
+		if suffix, ok := submatch(source, m, 1, 2); ok && suffix == "-file" {
 			return true
 		}
 	}
@@ -184,15 +247,14 @@ func applyIgnores(links []Link, source []byte, codeRanges [][2]int, lineOf func(
 			continue
 		}
 		line := lineOf(m[0])
-		if m[2] < 0 { // no suffix → same line
-			ignoreLines[line] = true
-			continue
-		}
-		switch string(source[m[2]:m[3]]) {
+		suffix, _ := submatch(source, m, 1, 2)
+		switch suffix {
 		case "-file":
 			ignoreFile = true
 		case "-next-line":
 			ignoreLines[line+1] = true
+		default: // no suffix → same line
+			ignoreLines[line] = true
 		}
 	}
 	if ignoreFile {
@@ -294,7 +356,7 @@ func codePathTarget(s string) (target, anchor string, ok bool) {
 	}
 	ext := path.Ext(target)
 	switch strings.ToLower(ext) {
-	case ".md", ".markdown", ".go":
+	case ".md", ".markdown", ".mdx", ".go":
 	default:
 		return "", "", false
 	}

@@ -400,11 +400,12 @@ func (c *SearchCmd) Run(g *Globals) error {
 // DupesCmd reports pairs of near-duplicate chunks — sections whose embeddings
 // are near-identical, i.e. likely redundant docs or guidance to consolidate.
 type DupesCmd struct {
-	MinScore   float64 `name:"min-score" default:"0.9" help:"Report pairs at or above this cosine score."`
-	Limit      int     `short:"n" default:"20" help:"Maximum pairs to return (<=0 for no cap)."`
-	Path       string  `help:"Restrict to files under this path prefix." placeholder:"PREFIX"`
-	WithinFile bool    `name:"within-file" help:"Also report near-duplicate pairs inside a single file."`
-	JSON       bool    `help:"Emit pairs as JSON instead of text blocks."`
+	MinScore   float64  `name:"min-score" default:"0.9" help:"Report pairs at or above this cosine score."`
+	Limit      int      `short:"n" default:"20" help:"Maximum pairs to return (<=0 for no cap)."`
+	Path       string   `help:"Restrict to files under this path prefix." placeholder:"PREFIX"`
+	Exclude    []string `name:"exclude" help:"Drop files under this path prefix from the scan (repeatable)." placeholder:"PREFIX"`
+	WithinFile bool     `name:"within-file" help:"Also report near-duplicate pairs inside a single file."`
+	JSON       bool     `help:"Emit pairs as JSON instead of text blocks."`
 }
 
 func (c *DupesCmd) Run(g *Globals) error {
@@ -421,6 +422,7 @@ func (c *DupesCmd) Run(g *Globals) error {
 		MinScore:   c.MinScore,
 		Limit:      c.Limit,
 		PathPrefix: c.Path,
+		Exclude:    c.Exclude,
 		WithinFile: c.WithinFile,
 	})
 	if err != nil {

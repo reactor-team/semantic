@@ -152,6 +152,8 @@ semantic <command> --help
 
 - **`dupes`** does an all-pairs cosine scan over content-bearing chunks (markdown
   sections *and* source doc-comments) to surface redundancy, cross-file by default.
+  `--path` narrows the scan to one subtree; `--exclude` (repeatable) drops
+  subtrees from it — a pair falls when either side matches.
 - **`graph`** resolves `[text](path)` and `[[wikilink]]` edges at query time, so
   renames fix links without rewriting sources. It reports **orphans** (no inbound
   link), **broken** links (target resolves to nothing), and **broken anchors**

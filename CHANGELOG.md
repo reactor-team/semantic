@@ -16,6 +16,18 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-04
+
+### Added
+
+- **`semantic dupes --exclude PREFIX` drops subtrees from the scan, repeatable.**
+  `--path` narrows the candidate set both sides of a pair are drawn from, so
+  dropping one tree — a code-generated directory that must never be
+  hand-edited — discarded every legitimate cross-directory pair along with it.
+  `--exclude` subtracts matching files from the candidate set instead, so a
+  pair falls when either side sits under an excluded prefix while a pair
+  between two remaining trees still reports.
+
 ## [0.3.0] — 2026-09-04
 
 MDX support: a documentation site written in `.mdx` now indexes, searches, and
@@ -318,7 +330,8 @@ Initial public release.
   build-provenance attestation. The archives carry the binary only; `semantic
   init` fetches the model and runtime on first use.
 
-[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/reactor-team/semantic/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/reactor-team/semantic/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/reactor-team/semantic/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/reactor-team/semantic/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/reactor-team/semantic/compare/v0.1.3...v0.2.0

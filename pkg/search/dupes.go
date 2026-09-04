@@ -2,6 +2,7 @@ package search
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/reactor-team/semantic/pkg/chunk"
 	"github.com/reactor-team/semantic/pkg/embed"
@@ -10,10 +11,11 @@ import (
 
 // DupeOptions tunes a near-duplicate scan.
 type DupeOptions struct {
-	MinScore   float64 // report pairs at or above this cosine value
-	Limit      int     // max pairs to return; <= 0 means no cap
-	PathPrefix string  // restrict to files under this rel-path prefix
-	WithinFile bool    // also report pairs from the same file (default: cross-file only)
+	MinScore   float64  // report pairs at or above this cosine value
+	Limit      int      // max pairs to return; <= 0 means no cap
+	PathPrefix string   // restrict to files under this rel-path prefix
+	Exclude    []string // drop files under any of these rel-path prefixes
+	WithinFile bool     // also report pairs from the same file (default: cross-file only)
 }
 
 // Pair is two chunks found to be near-duplicates, ordered so A sorts before
@@ -56,7 +58,7 @@ func Duplicates(src ChunkSource, opts DupeOptions) ([]Pair, error) {
 	// heading's own variants matching each other.
 	var cand []index.ChunkRow
 	for _, r := range rows {
-		if dupeVariants[r.Variant] {
+		if dupeVariants[r.Variant] && !excluded(r.RelPath, opts.Exclude) {
 			cand = append(cand, r)
 		}
 	}
@@ -95,6 +97,23 @@ func Duplicates(src ChunkSource, opts DupeOptions) ([]Pair, error) {
 		pairs = pairs[:opts.Limit]
 	}
 	return pairs, nil
+}
+
+// excluded reports whether rel sits under any of the given prefixes — plain
+// string prefixes, mirroring --path's SQL LIKE 'prefix%' rather than a
+// path-segment match. An excluded chunk leaves the candidate set outright,
+// so it can appear on neither side of a pair.
+func excluded(rel string, prefixes []string) bool {
+	for _, p := range prefixes {
+		// An empty prefix would match every path; treat it as unset, as --path does.
+		if p == "" {
+			continue
+		}
+		if strings.HasPrefix(rel, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // hitOf projects an index row into the Hit shape shared with search results,

@@ -86,6 +86,75 @@ func TestDuplicates_SkipsNavigationalVariants(t *testing.T) {
 	}
 }
 
+func TestDuplicates_ExcludeDropsPairWhenOneSideMatches(t *testing.T) {
+	t.Parallel()
+	src := &fakeSource{rows: []index.ChunkRow{
+		vrow("gen/out.md", "g", chunk.VariantNarrow, embed.Vec{1, 0}),
+		vrow("doc/a.md", "a", chunk.VariantNarrow, embed.Vec{1, 0}),
+	}}
+	pairs, err := Duplicates(src, DupeOptions{MinScore: 0.9, Exclude: []string{"gen/"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A "both sides must match" implementation would keep this pair.
+	if len(pairs) != 0 {
+		t.Fatalf("a pair with one excluded side must drop; got %d pairs", len(pairs))
+	}
+}
+
+func TestDuplicates_ExcludeKeepsPairsAcrossRemainingDirs(t *testing.T) {
+	t.Parallel()
+	// doc/↔notes/ is one pair --path cannot select on its own.
+	src := &fakeSource{rows: []index.ChunkRow{
+		vrow("gen/out.md", "g", chunk.VariantNarrow, embed.Vec{1, 0}),
+		vrow("doc/a.md", "a", chunk.VariantNarrow, embed.Vec{1, 0}),
+		vrow("notes/b.md", "b", chunk.VariantNarrow, embed.Vec{1, 0}),
+	}}
+	pairs, err := Duplicates(src, DupeOptions{MinScore: 0.9, Exclude: []string{"gen/"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pairs) != 1 {
+		t.Fatalf("want only the doc/notes pair; got %d pairs", len(pairs))
+	}
+	if pairs[0].A.RelPath != "doc/a.md" || pairs[0].B.RelPath != "notes/b.md" {
+		t.Errorf("pair endpoints = %s,%s; want doc/a.md,notes/b.md", pairs[0].A.RelPath, pairs[0].B.RelPath)
+	}
+}
+
+func TestDuplicates_ExcludePrefixesCompose(t *testing.T) {
+	t.Parallel()
+	src := &fakeSource{rows: []index.ChunkRow{
+		vrow("gen/out.md", "g", chunk.VariantNarrow, embed.Vec{1, 0}),
+		vrow("vendor/lib.md", "v", chunk.VariantNarrow, embed.Vec{1, 0}),
+		vrow("doc/a.md", "a", chunk.VariantNarrow, embed.Vec{1, 0}),
+	}}
+	pairs, err := Duplicates(src, DupeOptions{MinScore: 0.9, Exclude: []string{"gen/", "vendor/"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pairs) != 0 {
+		t.Fatalf("both excluded subtrees must drop; got %d pairs", len(pairs))
+	}
+}
+
+func TestDuplicates_ExcludeIgnoresEmptyPrefix(t *testing.T) {
+	t.Parallel()
+	// An empty prefix matches every path, so an unset --exclude= must be inert
+	// rather than silently emptying the scan.
+	src := &fakeSource{rows: []index.ChunkRow{
+		vrow("doc/a.md", "a", chunk.VariantNarrow, embed.Vec{1, 0}),
+		vrow("notes/b.md", "b", chunk.VariantNarrow, embed.Vec{1, 0}),
+	}}
+	pairs, err := Duplicates(src, DupeOptions{MinScore: 0.9, Exclude: []string{""}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pairs) != 1 {
+		t.Fatalf("an empty prefix must not exclude anything; got %d pairs", len(pairs))
+	}
+}
+
 func TestDuplicates_SortsByScoreDescAndCaps(t *testing.T) {
 	t.Parallel()
 	src := &fakeSource{rows: []index.ChunkRow{

@@ -72,8 +72,12 @@ Complaints.
 `
 	got := chunkBody(body)
 
-	if h1 := find(got, "body/0/community-perception/path"); !strings.Contains(h1.Text, "# Community Perception") {
-		t.Fatalf("H1 path chunk missing/incorrect; keys %v", keysOf(got))
+	// The H1 has no direct content of its own (its first child heading
+	// follows immediately) but its subtree is not empty, so it gets a `full`
+	// rollup chunk rather than a bare `path` chunk — path is reserved for a
+	// heading whose own text AND whole subtree are both empty.
+	if h1 := find(got, "body/0/community-perception/full"); !strings.Contains(h1.Text, "# Community Perception") {
+		t.Fatalf("H1 full chunk missing/incorrect; keys %v", keysOf(got))
 	}
 
 	gr := findContaining(got, "google-reviews", VariantNarrow)
@@ -100,6 +104,38 @@ Complaints.
 	}
 	if !strings.Contains(contentFull.Text, "Complaints.") {
 		t.Errorf("content /full should roll up Facebook too; got %q", contentFull.Text)
+	}
+}
+
+// TestChunkBody_EmptyHeadingGetsPathChunk pins the one case path chunks
+// still exist for: a heading with no direct content and an empty subtree
+// (a sibling heading follows immediately). Store.FileHeadings needs at
+// least one chunk row per heading to derive a valid #anchor from, so this
+// heading must not vanish from the index entirely.
+func TestChunkBody_EmptyHeadingGetsPathChunk(t *testing.T) {
+	t.Parallel()
+	body := "# Doc\n\n## Future work\n\n## Next\n\nSome text.\n"
+	got := chunkBody(body)
+
+	fw := find(got, "body/1/future-work/path")
+	if fw.Key == "" {
+		t.Fatalf("empty heading should still get a path chunk; keys %v", keysOf(got))
+	}
+	if fw.Variant != VariantPath || fw.Heading != "# Doc > ## Future work" {
+		t.Errorf("empty heading chunk = %+v, want path variant with breadcrumb `# Doc > ## Future work`", fw)
+	}
+	// It must be the ONLY chunk for that heading — no narrow/full alongside it.
+	if n := find(got, "body/1/future-work/narrow"); n.Key != "" {
+		t.Errorf("empty heading should not also get a narrow chunk; keys %v", keysOf(got))
+	}
+
+	// "# Doc" has no direct content either, but its subtree (the Next
+	// section) is not empty, so it gets a `full` rollup, not `path`.
+	if doc := find(got, "body/0/doc/full"); !strings.Contains(doc.Text, "Some text.") {
+		t.Errorf("`# Doc` should get a full rollup chunk containing its subtree; keys %v", keysOf(got))
+	}
+	if p := find(got, "body/0/doc/path"); p.Key != "" {
+		t.Errorf("`# Doc` should not get a path chunk (its subtree has content); keys %v", keysOf(got))
 	}
 }
 
@@ -131,7 +167,9 @@ func TestDocument_LineNumbers(t *testing.T) {
 	if title := find(got, VariantTitle); title.Line != 1 {
 		t.Errorf("title chunk line = %d, want 1", title.Line)
 	}
-	if h1 := findContaining(got, "/alice/", VariantPath); h1.Line != 5 {
+	// "# Alice" has direct content ("Intro.") before "## Notes", so it gets a
+	// `narrow` chunk, not `path` — path is reserved for a content-empty heading.
+	if h1 := findContaining(got, "/alice/", VariantNarrow); h1.Line != 5 {
 		t.Errorf("`# Alice` chunk line = %d, want 5 (keys %v)", h1.Line, keysOf(got))
 	}
 	if notes := findContaining(got, "/notes/", VariantNarrow); notes.Line != 9 {
@@ -143,7 +181,9 @@ func TestChunkBody_LineNumbersNoFrontmatter(t *testing.T) {
 	t.Parallel()
 	// Leading blank line, so "# Top" is on line 2 and "## Sub" on line 5.
 	got := chunkBody("\n# Top\n\nText.\n\n## Sub\n\nMore.\n")
-	if top := findContaining(got, "/top/", VariantPath); top.Line != 2 {
+	// "# Top" has direct content ("Text.") before "## Sub", so `narrow`, not
+	// `path`.
+	if top := findContaining(got, "/top/", VariantNarrow); top.Line != 2 {
 		t.Errorf("`# Top` line = %d, want 2 (keys %v)", top.Line, keysOf(got))
 	}
 	if sub := findContaining(got, "/sub/", VariantNarrow); sub.Line != 6 {

@@ -16,6 +16,20 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+### Changed
+
+- **[reindex]** **A markdown heading's breadcrumb-only `path` chunk is now
+  emitted only when the heading has no content of its own and an empty
+  subtree.** Previously every heading got one regardless. Measured across two
+  independent retrieval benchmarks, the always-emitted `path` chunk never
+  ranked in a query's top 30 results — retrieval-inert — while accounting for
+  roughly 46% of a vault's chunk count, and so of embedding time and index
+  size on every `semantic index`. It is kept for the one case it is load-
+  bearing: a heading with neither direct content nor a non-empty subtree
+  (e.g. a placeholder `## Future work` with nothing under it) still needs a
+  chunk row for `FileHeadings` to derive a valid `#anchor` from. Every vault
+  re-embeds once on the first index after upgrading.
+
 ## [0.4.0] — 2026-09-04
 
 ### Added

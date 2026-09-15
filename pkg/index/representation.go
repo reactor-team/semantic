@@ -38,7 +38,7 @@ const (
 	// chunkVersion covers anything that changes a chunk's key, text, variant,
 	// heading path, or line — every chunker, and the markdown simplifier they
 	// share. Bumping it re-chunks and re-embeds the whole vault.
-	chunkVersion = 4
+	chunkVersion = 5
 
 	// linkVersion covers link extraction only: which edges a file yields, and
 	// their targets, anchors, kinds, and lines. Bumping it re-extracts links

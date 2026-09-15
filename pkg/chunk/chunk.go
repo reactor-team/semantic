@@ -142,17 +142,19 @@ func stringList(v any) []string {
 	return nil
 }
 
-// chunkBody walks a body's heading tree and emits up to three chunks per
+// chunkBody walks a body's heading tree and emits up to two chunks per
 // heading, each carrying the full breadcrumb path:
 //
-//   - path:   breadcrumb only, no content — a structural "where is X
-//     discussed?" match.
 //   - narrow: breadcrumb + this heading's direct content (up to the next
 //     heading of any level) — matches the specific paragraph.
 //   - full:   breadcrumb + the whole subtree (up to the next same-or-
 //     shallower heading) — rolls the section up at each level so H1/H2
 //     chunks carry section summaries. Skipped when it would duplicate
 //     narrow (leaves).
+//
+// A heading with neither — no direct content and an empty subtree — gets a
+// third kind, path (breadcrumb only, no content), so it still has a chunk
+// FileHeadings can read an anchor from; see emitVariants.
 //
 // A body with no headings produces a single `body` chunk with the full
 // text. An empty body produces nothing.
@@ -234,17 +236,25 @@ type section struct {
 	line  int
 }
 
-// emitVariants builds the path/narrow/full chunks for one heading. narrow is
-// omitted when the heading has no direct content; full is omitted when it would
-// duplicate narrow — a leaf heading is its own subtree.
+// emitVariants builds the narrow/full/path chunks for one heading. narrow is
+// omitted when the heading has no direct content; full is omitted when it
+// would duplicate narrow — a leaf heading is its own subtree. path is emitted
+// only when neither narrow nor full is, so a heading whose own text and whole
+// subtree are both empty still gets one chunk — FileHeadings needs at least
+// a row per heading to validate a link's #anchor. Measured retrieval-inert
+// otherwise (never ranked in a query's top 30 across two eval sets) at ~46%
+// of a vault's chunk count, hence dropping it everywhere else.
 func emitVariants(sec section, narrowText, fullText string) []Chunk {
-	out := []Chunk{{
-		Key:     fmt.Sprintf("body/%d/%s/path", sec.index, sec.slug),
-		Heading: sec.path,
-		Variant: VariantPath,
-		Text:    sec.path,
-		Line:    sec.line,
-	}}
+	var out []Chunk
+	if narrowText == "" && fullText == "" {
+		out = append(out, Chunk{
+			Key:     fmt.Sprintf("body/%d/%s/path", sec.index, sec.slug),
+			Heading: sec.path,
+			Variant: VariantPath,
+			Text:    sec.path,
+			Line:    sec.line,
+		})
+	}
 	if narrowText != "" {
 		out = append(out, Chunk{
 			Key:     fmt.Sprintf("body/%d/%s/narrow", sec.index, sec.slug),

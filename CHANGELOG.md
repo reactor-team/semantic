@@ -16,6 +16,8 @@ so this is a note about cost rather than an instruction — `semantic index
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-09-15
+
 ### Changed
 
 - **[reindex]** **A markdown heading's breadcrumb-only `path` chunk is now

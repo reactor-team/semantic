@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// OrtVersion is the ONNX Runtime release whose C API onnxruntime_go v1.33.0
+// OrtVersion is the ONNX Runtime release whose C API onnxruntime_go v1.36.0
 // is built against. The two are coupled: the binding compiles against one
 // version of the headers and dlopens whatever this constant downloaded, so
 // bumping the Go module without bumping this constant produces a binary that

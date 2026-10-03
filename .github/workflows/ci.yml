@@ -71,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           experimental: true
 
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           experimental: true
       - name: Cache Go build and module cache
@@ -109,7 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           experimental: true
       - run: mise run deps
@@ -119,7 +119,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           experimental: true
       # govulncheck: fails only on a CVE with a call path reachable from this
@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           experimental: true
       # Fails on a copyleft or unclassifiable dependency, and on any source file
@@ -150,7 +150,7 @@ jobs:
       # The build task stamps a version derived from `git describe`, so it needs
       # tags, which a default shallow checkout does not fetch.
       - run: git fetch --tags --force --depth=1 origin || true
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           experimental: true
       - run: mise run build

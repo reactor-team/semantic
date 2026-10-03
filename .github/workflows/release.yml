@@ -57,7 +57,7 @@ jobs:
           # rather than a synthetic shallow commit.
           fetch-depth: 0
 
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           experimental: true
 

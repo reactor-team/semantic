@@ -12,7 +12,7 @@ golangci-lint run ./...
 
 # -x follows `source`d files so a shared helper is analysed too.
 echo "==> shellcheck"
-shellcheck -x mise-tasks/*.sh
+shellcheck -x mise-tasks/*.sh .github/scripts/mise-pin.sh
 
 # actionlint checks workflow syntax, expression types, and runner labels — the
 # last of which GitHub retires without warning.

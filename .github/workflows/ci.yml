@@ -71,8 +71,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Read mise pin
+        shell: bash
+        run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
       - uses: jdx/mise-action@v4
         with:
+          version: ${{ env.MISE_VERSION }}
+          sha256: ${{ env.MISE_SHA256 }}
           experimental: true
 
       - name: Cache Go build and module cache
@@ -91,9 +96,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Read mise pin
+        shell: bash
+        run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
       - uses: jdx/mise-action@v4
         with:
+          version: ${{ env.MISE_VERSION }}
+          sha256: ${{ env.MISE_SHA256 }}
           experimental: true
+      - name: Test mise bootstrap
+        run: |
+          python3 .github/scripts/test-mise-pin.py
+          python3 .github/scripts/test-mise-release-bootstrap.py
       - name: Cache Go build and module cache
         uses: actions/cache@v6
         with:
@@ -109,8 +123,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Read mise pin
+        shell: bash
+        run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
       - uses: jdx/mise-action@v4
         with:
+          version: ${{ env.MISE_VERSION }}
+          sha256: ${{ env.MISE_SHA256 }}
           experimental: true
       - run: mise run deps
 
@@ -119,8 +138,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Read mise pin
+        shell: bash
+        run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
       - uses: jdx/mise-action@v4
         with:
+          version: ${{ env.MISE_VERSION }}
+          sha256: ${{ env.MISE_SHA256 }}
           experimental: true
       # govulncheck: fails only on a CVE with a call path reachable from this
       # module, so a finding here is actionable rather than a version match.
@@ -131,8 +155,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Read mise pin
+        shell: bash
+        run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
       - uses: jdx/mise-action@v4
         with:
+          version: ${{ env.MISE_VERSION }}
+          sha256: ${{ env.MISE_SHA256 }}
           experimental: true
       # Fails on a copyleft or unclassifiable dependency, and on any source file
       # that lost its SPDX header. See mise-tasks/licenses.sh for the policy.
@@ -150,8 +179,13 @@ jobs:
       # The build task stamps a version derived from `git describe`, so it needs
       # tags, which a default shallow checkout does not fetch.
       - run: git fetch --tags --force --depth=1 origin || true
+      - name: Read mise pin
+        shell: bash
+        run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
       - uses: jdx/mise-action@v4
         with:
+          version: ${{ env.MISE_VERSION }}
+          sha256: ${{ env.MISE_SHA256 }}
           experimental: true
       - run: mise run build
       - name: Smoke-test the binary

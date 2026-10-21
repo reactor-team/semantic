@@ -63,7 +63,8 @@ var jsxHrefPattern = regexp.MustCompile(
 	`href\s*=\s*(?:` +
 		`"([^"]*)"|'([^']*)'` + // attribute form
 		"|\\{\\s*(?:\"([^\"]*)\"|'([^']*)'|`([^`${]*)`)\\s*\\}" + // expression form
-		`)`)
+		`)`,
+)
 
 // ignorePattern matches an ESLint-style suppression directive in either comment
 // syntax: `semantic-ignore` drops references on the same line, `-next-line` the

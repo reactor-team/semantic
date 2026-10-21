@@ -36,7 +36,7 @@ pull request.
 
 You need three things:
 
-- **Go 1.26 or later.** The version is pinned in [`.go-version`](.go-version).
+- **Go.** Use the version pinned in [`.go-version`](.go-version).
 - **A C compiler.** The ONNX runtime links via cgo, so `CGO_ENABLED=1` is
   required. On macOS run `xcode-select --install`. On Debian or Ubuntu install
   `build-essential`.

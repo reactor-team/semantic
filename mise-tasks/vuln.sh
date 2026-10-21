@@ -11,17 +11,17 @@ set -euo pipefail
 # It complements `mise run licenses`. That task asks whether a dependency is
 # legally safe to ship; this one asks whether it is currently safe to run.
 
-GOVULNCHECK_VERSION="v1.1.4"
+GOVULNCHECK_VERSION="v1.8.0"
 
 # onnxruntime_go links via cgo, so the build graph does not resolve without it.
 export CGO_ENABLED=1
 
-BIN_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/semantic-tools/bin"
+BIN_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/semantic-tools/govulncheck/$GOVULNCHECK_VERSION/$(go env GOVERSION)/bin"
 mkdir -p "$BIN_DIR"
 
 if [[ ! -x "$BIN_DIR/govulncheck" ]]; then
   echo "==> installing govulncheck $GOVULNCHECK_VERSION"
-  GOBIN="$BIN_DIR" go install "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION"
+  GOTOOLCHAIN=local GOBIN="$BIN_DIR" go install "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION"
 fi
 
 echo "==> scanning for reachable vulnerabilities"

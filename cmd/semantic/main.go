@@ -178,7 +178,8 @@ func assertVectorsComparable(st *index.Store) error {
 	return fmt.Errorf(
 		"index was built with %s but this run embeds with %s — scores between the two are meaningless.\n"+
 			"       Drop --no-reindex to rebuild the index, or pass --model to match what built it",
-		stored, embed.RepresentationID())
+		stored, embed.RepresentationID(),
+	)
 }
 
 // ensureEmbedReady fetches the runtime and model when they are missing, so a

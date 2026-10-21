@@ -14,9 +14,8 @@
 # and the build/install/test tasks.
 
 [tools]
-# golangci-lint + gotestsum pinned to the reactor ecosystem versions so local
-# lint/test behaves the same here as in the monorepo.
-golangci-lint = "2.11.4"
+# Build golangci-lint with the project Go toolchain. Pin gotestsum for tests.
+"go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = { version = "2.14.0", install_env = { GOTOOLCHAIN = "local" } }
 gotestsum = "1.13.0"
 # The build tasks are shell and the release path is GitHub Actions, so both are
 # linted alongside the Go. actionlint knows which runner labels GitHub still

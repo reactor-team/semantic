@@ -366,8 +366,8 @@ func HeadingLeaf(breadcrumb string) string {
 		return ""
 	}
 	seg := breadcrumb
-	if i := strings.LastIndex(breadcrumb, " > "); i >= 0 {
-		seg = breadcrumb[i+len(" > "):]
+	if _, after, ok := strings.CutLast(breadcrumb, " > "); ok {
+		seg = after
 	}
 	return strings.TrimSpace(strings.TrimLeft(seg, "#"))
 }

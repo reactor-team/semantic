@@ -74,7 +74,7 @@ jobs:
       - name: Read mise pin
         shell: bash
         run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           version: ${{ env.MISE_VERSION }}
           sha256: ${{ env.MISE_SHA256 }}
@@ -99,7 +99,7 @@ jobs:
       - name: Read mise pin
         shell: bash
         run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           version: ${{ env.MISE_VERSION }}
           sha256: ${{ env.MISE_SHA256 }}
@@ -126,7 +126,7 @@ jobs:
       - name: Read mise pin
         shell: bash
         run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           version: ${{ env.MISE_VERSION }}
           sha256: ${{ env.MISE_SHA256 }}
@@ -141,7 +141,7 @@ jobs:
       - name: Read mise pin
         shell: bash
         run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           version: ${{ env.MISE_VERSION }}
           sha256: ${{ env.MISE_SHA256 }}
@@ -158,7 +158,7 @@ jobs:
       - name: Read mise pin
         shell: bash
         run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           version: ${{ env.MISE_VERSION }}
           sha256: ${{ env.MISE_SHA256 }}
@@ -182,7 +182,7 @@ jobs:
       - name: Read mise pin
         shell: bash
         run: bash .github/scripts/mise-pin.sh >> "$GITHUB_ENV"
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           version: ${{ env.MISE_VERSION }}
           sha256: ${{ env.MISE_SHA256 }}
